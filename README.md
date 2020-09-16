@@ -27,4 +27,6 @@ The * (sub menu)  section gives access to the Timer- and Race modules. Weather d
 For further insight to the sub-menus please check the MAIA.png flowchart
 
 # Data acquisition
-Data is picked up via UDP on a standard LAN either wired or wireless in order to service as many display configurations as desired on board. Instrument data are acquired and submitted from the MAIAserver (see separate git) or any other device capable of broadcasting standard NMEA-strings via UDP.  
+Data is picked up via UDP on a standard LAN either wired or wireless in order to service as many display configurations as desired on board. Instrument data are acquired and submitted from the MAIA server (see MAIAserver.py) or any other device capable of broadcasting standard NMEA-strings via UDP.  
+
+The MAIA application can be tested by running MAIAsimulator.py on a separate RPi connected to same LAN. This will take you on a virtual but realistic trip around the Danish island Anholt in a fairly stable westerly breeze. If you at the samt time start a trip in MAIA you can after 3-4 hours upload the CSV-file to Google maps and test the log data that were recorded.
