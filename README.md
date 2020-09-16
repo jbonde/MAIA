@@ -21,9 +21,11 @@ NOW shows information about actual Position such as GPS-Coordinates, Speed and H
 
 DES (Destination) features a Waypoint selector/editor and shows distance/bearing to selected waypoint. There is also a time calculator showing estimated Time-To-Go and ETA.
 
+DASH will take you to the dashboard which is coded in a "B&G" style with a left and right column showing live data from instruments. The center is a compass rose with four coloured lines representing COG, BRG, TWD and AWA. Tapping the display will change the view from "North-up" to "Course-up".
+
 The * (sub menu)  section gives access to the Timer- and Race modules and Weather data from the temperature, air pressure and humidity sensors as well as system information. Settings can also be reached from this section. 
 
-For further insight to the general flow sub-menus please check the MAIA.png flowchart
+For further insight to the general flow and sub-menus please check the MAIA.png flowchart 
 
 # Data acquisition
 Data is picked up via UDP on a standard LAN either wired or wireless in order to service as many display configurations as desired on board. Instrument data are acquired and submitted from the MAIA server (see MAIAserver.py) or any other device capable of broadcasting standard NMEA-strings via UDP. For full data feed the MAIAserver with weather sensors is required.
