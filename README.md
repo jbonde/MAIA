@@ -15,18 +15,18 @@ When switching on the system a matrix menu presents 6 choices:
 * Access to the sub menus
 
 # Functionality
-
 DEP (Departure) include Trip Start and Trip Stop functions. Other functions displays Distance Covered, Trip time, Average Speed and Max Speed. A digital log is automatically enabled when the trip is started so all data are saved at short intervals in a format that can be uploaded directly to Google Maps or used in spreadsheets for further analysis.
 
 NOW shows information about actual Position such as GPS-Coordinates, Speed and Heading
 
 DES (Destination) features a Waypoint selector/editor and shows distance/bearing to selected waypoint. There is also a time calculator showing estimated Time-To-Go and ETA.
 
-The * (sub menu)  section gives access to the Timer- and Race modules. Weather data from the temperature, air pressure and humidity sensors as well as system information, battery status and settings can also be reached from this section. For full data feed the MAIAserver is required
+The * (sub menu)  section gives access to the Timer- and Race modules and Weather data from the temperature, air pressure and humidity sensors as well as system information. Settings can also be reached from this section. 
 
-For further insight to the sub-menus please check the MAIA.png flowchart
+For further insight to the general flow sub-menus please check the MAIA.png flowchart
 
 # Data acquisition
-Data is picked up via UDP on a standard LAN either wired or wireless in order to service as many display configurations as desired on board. Instrument data are acquired and submitted from the MAIA server (see MAIAserver.py) or any other device capable of broadcasting standard NMEA-strings via UDP.  
+Data is picked up via UDP on a standard LAN either wired or wireless in order to service as many display configurations as desired on board. Instrument data are acquired and submitted from the MAIA server (see MAIAserver.py) or any other device capable of broadcasting standard NMEA-strings via UDP. For full data feed the MAIAserver with weather sensors is required.
 
+# Testing
 The MAIA application can be tested by running MAIAsimulator.py on a separate RPi connected to same LAN. This will take you on a virtual but realistic trip around the Danish island Anholt in a fairly stable westerly breeze. If you at the samt time start a trip in MAIA you can after 3-4 hours upload the CSV-file to Google maps and test the log data that were recorded.
