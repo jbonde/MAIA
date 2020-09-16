@@ -4,14 +4,21 @@ MAIA is a maritime information and utility tool to be installed as a supplement 
 
 As for using the system on smaller displays for Raspberry Pi's like PiTFT 3.5" or the official RPi 7" the amount of items in menus are kept to a minimum comprising 6 choices in a 3x2 matrix. All information displayed is primarily one value at a time, but there are options for selecting more information if the user can read it on the current display. When data is displayed the screen works as a full size button and touching the screen will revert to the last menu.
 
-When switching on the system the top line menu presents 3 categories:
+When switching on the system a matrix menu presents 6 choices:
+
+Top line
 * Actions and information related to departure
 * Overview of actual position
 * Data related to the destination
 
-Bottom line har direct selection of the Dashboard that comprises most live data but also fast access to a MOB (Man Over Board) function. Finally access to the sub menus is done in the last cell in matrix.
+Bottom line 
+* Dashboard that comprises most live data 
+* MOB (Man Over Board) function
+* Access to the sub menus
 
-Functionality
+For further insight to the sub-menus please check the MAIA.png flowchart
+
+# Functionality
 
 Departure include Trip Start and Trip Stop functions. Other functions displays Distance Covered, Trip time, Average Speed and Max Speed. A digital log is automatically enabled when the trip is started. It saves all data at short intervals in a format that can be used in spreadsheets for further analysis.
 
