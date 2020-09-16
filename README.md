@@ -1,19 +1,16 @@
 # MAIA
-MAIA project
-The Maritime Information Application
-MAIA is a maritime information tool to be installed as a supplement to plotters or mobile navigation devices in order to optimize access and readability for critical yacht data.
+Stands for MAritime Information Application
 
-MAIA is made for touch screens and all menus are designed with an intuitive user interface which enables quick and easy access to information during sailing through a simple layout that is visible everywhere in a standard cockpit.
+MAIA is a maritime information and utility tool to be installed as a supplement to plotters or mobile navigation devices in order to optimize access and readability for critical yacht data. The software is targeted for small touch screens and all menus are designed with an intuitive user interface which enables quick and easy access to information during sailing through a simple layout that is visible everywhere in a standard cockpit.
+
+As for using the system on smaller displays for Raspberry Pi's like PiTFT 3.5" or the official RPi 7" the amount of items in menus are kept to a minimum comprising 6 choices in a 3x2 matrix. All information displayed is primarily one value at a time, but there are options for selecting more information if the user can read it on the current display.
 
 When switching on the system the top line menu presents 3 categories:
+* Actions and information related to departure
+* Overview of actual position
+* Data related to the destination
 
-Actions and information related to departure
-
-Overview of actual position
-
-Data related to the destination
-
-The Main menu also features a MOB (Man Over Board) function and access to the sub menus
+Bottom line har direct selection of the Dashboard that comprises most live data but also fast access to a MOB (Man Over Board) function. Finally access to the sub menus is done in the last cell in matrix.
 
 Functionality
 
