@@ -23,12 +23,15 @@ DES (Destination) features a Waypoint selector/editor and shows distance/bearing
 
 DASH will take you to the dashboard which is coded in a "B&G" style with a left and right column showing live data from instruments. The center is a compass rose with four coloured lines representing COG, BRG, TWD and AWA. Tapping the display will change the view from "North-up" to "Course-up".
 
-The * (sub menu)  section gives access to the Timer- and Race modules and Weather data from the temperature, air pressure and humidity sensors as well as system information. Settings can also be reached from this section. 
+The * (sub menu)  section gives access to the Timer- and Race modules and Weather data from the temperature, air pressure and humidity sensors as well as system information. Settings can also be reached from this section eg if you would like a layout with black background and dim the display during night passages.
 
-For further insight to the general flow and sub-menus please check the MAIA.png flowchart 
+For further insight to the general flow and sub-menus please check MAIA_functionality.png and the MAIA.png flowchart 
 
 # Data acquisition
 Data is picked up via UDP on a standard LAN either wired or wireless in order to service as many display configurations as desired on board. Instrument data are acquired and submitted from the MAIA server (see MAIAserver.py) or any other device capable of broadcasting standard NMEA-strings via UDP. For full data feed the MAIAserver with weather sensors is required.
 
 # Testing
-The MAIA application can be tested by running MAIAsimulator.py on a separate RPi connected to same LAN. This will take you on a virtual but realistic trip around the Danish island Anholt in a fairly stable westerly breeze. If you at the samt time start a trip in MAIA you can after 3-4 hours upload the CSV-file to Google maps and test the log data that were recorded.
+The MAIA application can be tested by running MAIAsimulator.py on a separate RPi connected to same LAN. This will take you on a virtual but realistic trip around the Danish island Anholt in a fairly stable westerly breeze. If you at the same time as launching the simulator will start a trip in MAIA you can after 6 hours fetch the CSV-file and upload the tour to Google maps for testing the log data that were recorded. You are also welcome to alter the data in the simulator in order to make a faster trip.
+
+# Disclaimer
+MAIA should never be used as the primary navigation tool. It is a supplement to proven products on the market and some features still need to be tested in live environments. So use of the system is by own responsibility and developers have no liabilities for any errors and problems occurred by the MAIA system. 
