@@ -33,8 +33,6 @@ MTW="$IIMTW,12.3,C" #Mean Temperature of Water
 # Non standard NMEA string containg data from weather station
 WEA="$GPWEA,tempin,tempout,pressure,humidity," 
 
-submitperiod=1 # time between UDP messages
-
 # Start position as decimal (Google) angles
 lat=56.71418 # Just outside Anholt harbour
 lon=11.50685 # 
@@ -44,11 +42,12 @@ dist=0
 bear=0
 variation=0.000015 #Change in position beween each update (app 5 knots)
 looptime=0 #keep track on how much time each loop takes in sec
+submitperiod=1 # time (sec) between UDP messages
 
 #Start data
 COG=0 # Default Course Over Ground 
 SOG=3 # Default Speed Over Ground 
-TWD=270 # True wind direction used for finding AWA
+TWD=255 # True wind direction used for finding AWA
 TWA=-90 # Angle between course and true wind
 TWS=10 # True wind speed (m/s) used for AWS
 AWA=1 # Apparent wind angle
@@ -70,6 +69,9 @@ pressure=1003
 humidity=78
 tempout=22.3
 
+# Convert m/s to knots
+TWS=TWS/0.514444
+
 def UDPmessage(UDPstring):
     UDPbytes = str.encode(UDPstring)
     udp = socket(AF_INET, SOCK_DGRAM)
@@ -78,22 +80,6 @@ def UDPmessage(UDPstring):
     udp.sendto(UDPbytes, (UDPaddress, UDPport))
     #print ("UDP sent (" + str(UDPport) + ")" + str(UDPstring))
 
-def WPTdistance(lat1,lon1,lat2,lon2):
-    # calculate distance between two coordinates in degree decimals
-
-    lat1rad=math.radians(float(lat1)) # convert to radians
-    lon1rad=math.radians(float(lon1)) # convert to radians
-    lat2rad=math.radians(float(lat2)) # convert to radians
-    lon2rad=math.radians(float(lon2)) # convert to radians
-
-    latdelta = abs(lat1rad-lat2rad)
-    londelta = abs(lon1rad-lon2rad)
-    R = 6371000 # Earth radius in meters
-    a=math.sin(latdelta/2) * math.sin(latdelta/2) + math.cos(lat1rad) * math.cos(lat2rad) * math.sin(londelta/2) * math.sin(londelta/2)
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-    distance = R * c #in meters
-    distance = distance/1852 # Convert to nautical miles
-    return(distance)
 
 def true2apparent():
     global AWS,AWA,AWS,AWD,AWAcos,TWA
@@ -169,6 +155,7 @@ while True:
     latdms=dec2dmm(lat)
     londms=dec2dmm(lon)
     distance=SOG*looptime/3600
+    looptime=0
 
     ''' # Following prints can be activated for extra testing:
     print("Distance since last update: " + str(distance))
@@ -191,11 +178,13 @@ while True:
     lonprev=lon
     RMC="$GPRMC,"+timenow+",A," + str(latdms) +",N," + str(londms)+ ",E,"+str('{:3.1f}'.format(SOG))+","+str('{:3.1f}'.format(COG))+","+datenow+",004.3,E*68"
 
-    # Speed adjustments before next GPS update
+    # Speed and TWS adjustments before next GPS update
     if SOGup==True:
         SOG=SOG+0.01
+        TWS=TWS-0.01
     else:
         SOG=SOG-0.01
+        TWS=TWS+0.01
     if SOG>=SOGmax:
         SOGup=False
     if SOG<=SOGmin:
@@ -236,4 +225,5 @@ while True:
         UDPmessage(UDPsentences[nmea])
         print(str(UDPsentences[nmea]))
         sleep(submitperiod)
+        looptime=looptime+submitperiod # for calculating distance since last position
     
