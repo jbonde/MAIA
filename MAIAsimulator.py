@@ -11,17 +11,33 @@ import random
 UDPaddress='255.255.255.255'
 UDPport=2000
 
-# Default instrument data (captured on board)
-VWR="$IIVWR,022.,L,19.2,N,,,," #Relative Wind Speed and Angle
-DBT="$IIDBT,0076.5,f,0021.2,M,," # Depth Below Transducer
-VHW="$IIVHW,,,05.23,N,," # Water speed and heading
+# Standard NMEA string received directly from GPS connected to USB-port or via NMEA0183
+RMC="225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68"
+'''
+           225446       Time of fix 22:54:46 UTC
+           A            Navigation receiver warning A = OK, V = warning
+           4916.45,N    Latitude 49 deg. 16.45 min North
+           12311.12,W   Longitude 123 deg. 11.12 min West
+           000.5        Speed over ground, Knots
+           054.7        Course Made Good, True
+           191194       Date of fix  19 November 1994
+           020.3,E      Magnetic variation 20.3 deg East
+           *68          mandatory checksum
+'''
+# Standard NMEA strings received from Autohelm ST1 instruments via NMEA converter
+DBT="$IIDBT,0076.5,f,0121.2,M,," # Depth Below Transducer
+VHW="$IIVHW,,,01.23,N,," #Water speed and heading
+VWR="$IIVWR,070.,R,19.2,N,,,," #Relative Wind Speed and Angle
 MTW="$IIMTW,12.3,C" #Mean Temperature of Water
+
+# Non standard NMEA string containg data from weather station
+WEA="$GPWEA,tempin,tempout,pressure,humidity," 
 
 submitperiod=1 # time between UDP messages
 
-# Start position as (Google) angles
-lat=56.71465 #55.942508
-lon=11.50691 #11.870814
+# Start position as decimal (Google) angles
+lat=56.71418 # Just outside Anholt harbour
+lon=11.50685 # 
 latprev=lat
 lonprev=lon
 dist=0
@@ -30,9 +46,8 @@ variation=0.000015 #Change in position beween each update (app 5 knots)
 looptime=0 #keep track on how much time each loop takes in sec
 
 #Start data
-
-COG=1 # Default Course Over Ground 
-SOG=2 # Default Speed Over Ground 
+COG=0 # Default Course Over Ground 
+SOG=3 # Default Speed Over Ground 
 TWD=270 # True wind direction used for finding AWA
 TWA=-90 # Angle between course and true wind
 TWS=10 # True wind speed (m/s) used for AWS
@@ -42,11 +57,11 @@ AWS=1 #Apparent wind speed
 AWAcos=None
 SOGup=True #Increase speed
 SOGmax=9 #Max speed
-SOGmin=1 #Min speed
+SOGmin=3 #Min speed
 AWSup=True
 AWSmax=25 #Max wind velocity knots
 AWSmin=1 #Max wind velocity knots
-depth=2.0
+depth=4.5
 STW=1 # Speed through water
 
 # MET data
@@ -54,11 +69,6 @@ tempin=18.3
 pressure=1003
 humidity=78
 tempout=22.3
-
-#datenow= str(datetime.now())[2:4] + str(datetime.now())[5:7]  + str(datetime.now())[8:10]      
-#print ("date " + datenow)
-#timenow=str(datetime.now())[11:13] + str(datetime.now())[14:16] + str(datetime.now())[17:19]
-#print ("time " + timenow)
 
 def UDPmessage(UDPstring):
     UDPbytes = str.encode(UDPstring)
@@ -110,15 +120,12 @@ def true2apparent():
         print("Avoiding zero division")
     # Finding apparent wind angle based on TWD, course and speed  
     AWAcos=((TWS*math.cos(TWA_rad)+SOG)/AWS)
-
-#    AWAcos=AWS*math.cos((TWS*math.cos(TWA_rad)+SOG)/AWS)
     if AWAcos>1:
         AWAcos=AWAcos-int(AWAcos)
     if AWAcos<-1:
         AWAcos=AWAcos+abs(int(AWAcos))
     AWArad=math.acos(AWAcos)
     AWA=math.degrees(AWArad)
-    #AWA=math.degrees(math.acos(AWS*math.cos((TWS*math.cos(TWD_rad)+SOG)/AWS)))
     
 def WPTcourse(lat1,lon1,lat2,lon2):
     # calculate course to selected waypoint from current position
@@ -154,18 +161,17 @@ def newpos():
     COGrad=math.radians(float(COG))
     lat=latprev+math.cos(COGrad)*distance/60
     lon=lonprev+math.sin(COGrad)*distance/60
-    print("New position " + str(lat) + "," +str(lon))
+    #print("New position " + str(lat) + "," +str(lon))
 
 while True:
     datenow=str(datetime.now())[2:4] + str(datetime.now())[5:7]  + str(datetime.now())[8:10]      
     timenow=str(datetime.now())[11:13] + str(datetime.now())[14:16] + str(datetime.now())[17:19]
-    #lat=lat+variation
     latdms=dec2dmm(lat)
-    #lon=lon+variation
     londms=dec2dmm(lon)
-    #dist=WPTdistance(lat,lon,latprev,lonprev)
     distance=SOG*looptime/3600
-#    print("Distance since last update: " + str(distance))
+
+    ''' # Following prints can be activated for extra testing:
+    print("Distance since last update: " + str(distance))
     print("Input values: ")
     print("SOG: " + str(SOG))
     print("COG: " + str(COG))
@@ -177,15 +183,13 @@ while True:
     print("AWA: " + str(AWA))
     print("AWD: " + str(AWD))
     print("AWS: " + str(AWS))
-    
+    ''' 
     newpos()
-    looptime=0
 
-    # Send GPS position
+    # Create GPS position
     latprev=lat
     lonprev=lon
-    GPS="$GPRMC,"+timenow+",A," + str(latdms) +",N," + str(londms)+ ",E,"+str('{:3.1f}'.format(SOG))+","+str('{:3.1f}'.format(COG))+","+datenow+",004.3,E*68"
-    UDPmessage(GPS)
+    RMC="$GPRMC,"+timenow+",A," + str(latdms) +",N," + str(londms)+ ",E,"+str('{:3.1f}'.format(SOG))+","+str('{:3.1f}'.format(COG))+","+datenow+",004.3,E*68"
 
     # Speed adjustments before next GPS update
     if SOGup==True:
@@ -201,13 +205,10 @@ while True:
     COG=COG+0.1
     if COG>360:
         COG=0
-    time.sleep(submitperiod)
-    looptime=looptime+submitperiod
 
     # Send Wind data
     true2apparent()
     VWR="$IIVWR," + str(abs(AWA)) + "," + str(AWD) + "," + str(AWS) + ",N,,,," #Relative Wind Speed and Angle
-    UDPmessage(VWR)
     
     # Wind speed adjustments before next update
     if AWSup==True:
@@ -218,58 +219,21 @@ while True:
         AWSup=False
     if AWS<=AWSmin:
         AWSup=True
-    
-    # Wind angle adjustments before next update
-    AWA=AWA+1
-    if AWA>=180:
-        AWA=-AWA # Apparent wind angle
-    if AWA>=0:    
-        AWD="R" #Apparent wind direction (left/right)
+
+    # Create depth info
+    if SOGup==True:
+        depth=depth+0.1
     else:
-        AWD="L"
-    AWS=AWS+0.1 #Apparent wind speed
-
-    time.sleep(submitperiod)
-    looptime=looptime+submitperiod
-    
-    # Send depth info
+        depth=depth-0.1
     DBT="$IIDBT,0076.5,f,"+str(depth)+",M,," # Depth Below Transducer
-    UDPmessage(DBT)
-    depth=depth+0.1
-    time.sleep(submitperiod)
-    looptime=looptime+submitperiod
 
-    # send other instrument data
+    # Create other instrument data
+    STW=abs(SOG-random.randint(0, 3)) #Make a random adjustment for current
     VHW="$IIVHW,,,"+str(STW)+",N,," # Water speed and heading
-    STW=abs(SOG-random.randint(0, 3))
-    UDPmessage(VHW)    
-    time.sleep(submitperiod)
-    looptime=looptime+submitperiod
+    WEA = "$GPWEA," + str(tempin) + "," + str(tempout) + "," + str(pressure) + "," + str(humidity) + "," + " " 
+    UDPsentences=[RMC,DBT,VHW,VWR,MTW,WEA]
+    for nmea in range(len(UDPsentences)):
+        UDPmessage(UDPsentences[nmea])
+        print(str(UDPsentences[nmea]))
+        sleep(submitperiod)
     
-    UDPmessage(MTW)
-    time.sleep(submitperiod)
-    looptime=looptime+submitperiod
-
-    MET = "$GPWEA," + str(tempin) + "," + str(tempout) + "," + str(pressure) + "," + str(humidity) + "," + " " 
-    UDPmessage(MET)
-    time.sleep(submitperiod)
-    looptime=looptime+submitperiod
-    print("looptime= " +str(looptime))
-
-'''
-Test sensors:
-dmesg | grep tty
-
-Sample string: $GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68
-
-
-           225446       Time of fix 22:54:46 UTC
-           A            Navigation receiver warning A = OK, V = warning
-           4916.45,N    Latitude 49 deg. 16.45 min North
-           12311.12,W   Longitude 123 deg. 11.12 min West
-           000.5        Speed over ground, Knots
-           054.7        Course Made Good, True
-           191194       Date of fix  19 November 1994
-           020.3,E      Magnetic variation 20.3 deg East
-           *68          mandatory checksum
-'''
