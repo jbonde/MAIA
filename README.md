@@ -12,7 +12,7 @@ When switching on the system a matrix menu presents 6 choices:
 * MOB (Man Over Board) function
 * Access to the sub menus
 
-# Functionality
+## Functionality
 DEP (Departure) include Trip Start and Trip Stop functions. Other functions displays Distance Covered, Trip time, Average Speed and Max Speed. A digital log is automatically enabled when the trip is started so all data are saved at short intervals in a format that can be uploaded directly to Google Maps or used in spreadsheets for further analysis.
 
 NOW shows information about actual Position such as GPS-Coordinates, Speed and Heading
@@ -25,11 +25,11 @@ The * (sub menu)  section gives access to the Timer- and Race modules and Weathe
 
 For further insight to the general flow and sub-menus please check MAIA_functionality.png and the MAIA.png flowchart 
 
-# Data acquisition
+## Data acquisition
 Data is picked up via UDP on a standard LAN either wired or wireless in order to service as many display configurations as desired on board. Instrument data are acquired and submitted from the MAIA server (see MAIAserver.py) or any other device capable of broadcasting standard NMEA-strings via UDP. For full data feed the MAIAserver with weather sensors is required.
 
-# Testing
-The MAIA application can be tested by running MAIAsimulator.py on a separate RPi connected to same LAN. This will take you on a virtual but realistic trip around the Danish island Anholt in a fairly stable westerly breeze. If you at the same time as launching the simulator will start a trip in MAIA you can after 6 hours fetch the CSV-file and upload the tour to Google maps for testing the log data that was recorded (check MAIA_simulator.png). You are impatient you are also welcome to alter the data in the simulator in order to make a faster trip.
+## Testing
+The MAIA application can be tested by running MAIAsimulator.py on a separate RPi connected to same LAN. This will take you on a virtual but realistic trip around the Danish island Anholt in a fairly stable westerly breeze. If a trip is started in MAIA at the same time as launching the simulator you can after some time fetch a date/time stamped CSV-file which can be uploaded directly to Google maps for testing the log data that was recorded. A full trip around the island takes 6 hours (check the screen shot MAIA_simulator.png).
 
-# Disclaimer
+## Disclaimer
 MAIA should never be used as the primary navigation tool. It is a supplement to proven products on the market and some features still need to be tested in live environments. So use of the system is by own responsibility and developers have no liabilities for any errors and problems related to the MAIA system.
