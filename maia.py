@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Maritime application for use with PiTFT panel
+# Maritime application for use with touch displays
 # Installation and configuration notes at bottom of code
 
 from guizero import App, Text, PushButton, Window, ListBox, Box, Picture,Drawing
@@ -21,7 +21,7 @@ gpioimport=False
 if OSplatform=="Windows":
     workdir="C:\\"
 elif OSplatform=="Linux": # Assuming RPi as hardware
-    import RPi.GPIO as GPIO
+    import RPi.GPIO as GPIO # used for dimming PiTFT display and turning on buzzer if installed with current display
     GPIO.setmode(GPIO.BCM)
     gpioimport=True
     try:
@@ -179,11 +179,12 @@ def ynmenu(title,action):
     window_ynmenu.bg=colorback
     window_ynmenu.text_color=colorfor
     window_ynmenu.show
+    ynbut_width=int(screen_width/65)
     text = Text(window_ynmenu, text="Do you really want to " + str(title) + " ?", width="fill", size=but_text_size)
-    but_ynmenu = PushButton(window_ynmenu, command=action, text="YES", width=11, height=but_height, align="left")
+    but_ynmenu = PushButton(window_ynmenu, command=action, text="YES", width=ynbut_width, height=but_height, align="left")
     but_ynmenu.text_size=but_text_size
     but_ynmenu.text_color=but_race_color
-    but_noynmenu = PushButton(window_ynmenu, command=window_ynmenu.hide, text="NO", width=11, height=but_height, align="right")
+    but_noynmenu = PushButton(window_ynmenu, command=window_ynmenu.hide, text="NO", width=ynbut_width, height=but_height, align="right")
     but_noynmenu.text_size=but_text_size
 
 def single_show(button_clicked):
@@ -429,11 +430,13 @@ def timer_update():
     if mode=="stop":
         but_single.text=ms
     if mode=="down":
-        doc=time.strftime("%M:%S", time.gmtime(abs(downcount))) # make the counter positive so it counts up after 0 and convert to time format
+        doc=time.strftime("%H:%M:%S", time.gmtime(abs(downcount))) # make the counter positive so it counts up after 0 and convert to time format
         if downcount<0:
             but_single.text_color="red"
         else:
             but_single.text_color=colorfor
+        if downcount<3600:
+            doc=time.strftime("%M:%S", time.gmtime(abs(downcount)))
         but_single.text=str(doc)
         downcount-=1
     if mode=="time":     
@@ -501,7 +504,7 @@ def timer_update():
 def display_on():
     global display_brightness
     display_brightness=70
-    pwm.ChangeDutyCycle(display_brightness)
+    #pwm.ChangeDutyCycle(display_brightness)
     setsave()
 '''    
 def display_off():
@@ -920,16 +923,16 @@ def UDPread():
         UDPaddress=addr[0]
         UDPstring = str(data)[2:] 
         header = UDPstring[3:6] # slicing out the header information (3 letters needed)
-        if header=="RMC":
-            print(UDPstring)  
-        if header=="MET":
-            METarray=UDPstring.split(",") #make array according to comma-separation in string
-            #print(METarray)
+        #if header=="RMC":
+        #    print(UDPstring)  
+        if header=="WEA":
+            WEAarray=UDPstring.split(",") #make array according to comma-separation in string
+            #print(WEAarray)
             #print(UDPaddress)  
-            tempin=(METarray [1])
-            tempout=(METarray [2])
-            pressure=(METarray [3])
-            humidity=(METarray [4])
+            tempin=(WEAarray [1])
+            tempout=(WEAarray [2])
+            pressure=(WEAarray [3])
+            humidity=(WEAarray [4])
         if header=="DBT":
             DBTarray=UDPstring.split(",") #DBT - Depth Below Transducer
             DEP='{:3.1f}'.format(float(DBTarray[3]))
@@ -1227,7 +1230,7 @@ def setload():
         UTZ_set(0)
         print("TIMEZ loaded: " + str(TIMEZ))
         display_brightness=int(settingsfile[0][2])
-        pwm.ChangeDutyCycle(display_brightness)
+        #pwm.ChangeDutyCycle(display_brightness)
         print("display_brightness loaded: " + str(display_brightness))
         posmodestr=str(settingsfile[0][2])
         if posmodestr=="True":
@@ -1364,8 +1367,8 @@ app.tk.attributes("-fullscreen", True)
 #app.tk.configure(cursor='none')
 screen_width = app.tk.winfo_screenwidth()
 screen_height = app.tk.winfo_screenheight()
-#if screen_width==720: #PiTFT is 720x480
-#    PiTFT()
+if screen_width==720: #PiTFT is 720x480
+    PiTFT()
 but_width=int(screen_width/95)
 if screen_height<=1000:
     but_height=int(screen_height/100)
@@ -1446,12 +1449,12 @@ window_num.text_size=but_text_size
 window_num.hide()
 box_num_title = Box(window_num, width="fill", align="top")
 num_title = Text(box_num_title, text="Title")
-num_title.text_size=but_text_medsize
+num_title.text_size=but_text_size
 box_num_input = Box(window_num, width="fill", align="top")
 num_input = Text(box_num_input, align="left")
-num_input.text_size=but_text_medsize
-num_width=4
-num_height=2
+num_input.text_size=but_text_size #35
+num_width=int(screen_width/180) #4
+num_height=int(screen_height/250) #2
 box_nums1 = Box(window_num, width="fill", align="top")
 box_nums = box_nums1 # Helps moving lines with buttons for other configurations
 but_num_0 = PushButton(box_nums, lambda:numboard("0"),text="0", width=num_width, height=num_height, align="left")
@@ -1663,7 +1666,7 @@ but_service_00 = PushButton(window_service, command=window_system.show, text="SY
 but_service_10 = PushButton(window_service, command=window_settings.show, text="SET", width=but_width, height=but_height, grid=[1,0])
 but_service_20 = PushButton(window_service, command=window_key.show, text="KEY", width=but_width+1, height=but_height, grid=[2,0])
 but_service_01 = PushButton(window_service, command=window_timer.show, text="TIME", width=but_width, height=but_height, grid=[0,1])
-but_service_11 = PushButton(window_service, command=window_met.show, text="MET", width=but_width, height=but_height, grid=[1,1])
+but_service_11 = PushButton(window_service, command=window_met.show, text="WEA", width=but_width, height=but_height, grid=[1,1])
 but_service_21 = PushButton(window_service, command=window_service.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
 #if BMP280import==False:
  #   but_service_11.text_color="red"
@@ -1765,66 +1768,15 @@ app.repeat(1000, GPSread) #read data from GPS 1/1 sec
 #Run the application
 app.display()
 
-# Need-to-have and nice-to-have
-
-'''
-Save and retreive POS/NEG display setting
-Dep dist live update
-Max speed
-Show moving and stopped time
-Anker alarm
-Alarm clock
-Celestial info
-Magnetic variation 
-Show positions as dms or dec
-webpage and apache server 
-Wpts import/export
-Google export positions
-Piezo buzzer GPIO output for alarms
-
-AUTO
-Shift AVS for use with newest
-Auto start AVS when sailing
-AVS reset function
-Create log file when speed is detected
-
-More variables under soft: navtime etc
-sound og buzzer at sensorserver
-splash screen with conditions 
-ST1 input from arduino or can hat
-kml import 
-GPS simulator
-edit waypoints
-delete waypoints
-
-******* DONE  **********
-POS/NEG display
-Count down function - presets and manual. Switch to red after zero is reached
-Create log file with all variables when GPS is ready and Trip is started
-add waypoints
-Formater UTZ til 00:00
-MAIA MAritime Information Application
-keyboard til wpts add
-Eta bruger sys time, som skal opdateres ift gps
-navn til projektet MAIA Navigator "marility" "MINAU" Marine Information Navigation And Utilities ?
-Des Bear format to 3 digits
-Collect all variables with status and show in separate menu under SYS
-mob 
-Checke avs calc. Viser de for lidt? Især avs10 ser underlig ud
-DONE Omdøb hard og soft til hw sw
-Ttgsec er 0 i soft
-TTG formateres ift <> 24h
-'''
-
 
 #Installation and configuration notes
 
 '''
 ALL apps to be installed with PIP3 for Python3 compatibility
-Make sure to copy the mypi.py to same directory as maia.py
+Make sure to copy mypi.py to same directory as maia.py
 
 ************************************************************
-For the 7" RPi TFT:
+For  7" RPi TFT:
     the screensaver can be disabled by installing: sudo apt install xscreensaver
 
     Control of brightness (0-255):
