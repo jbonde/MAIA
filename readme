@@ -1,0 +1,4 @@
+# Installation notes
+Guide and tips for installation
+## Server
+The server is based on a standard RPi (Zero is fine) and some components for interfacing with peripherals
