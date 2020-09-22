@@ -2,3 +2,52 @@
 Guide and tips for installation
 ## Server
 The server is based on a standard RPi (Zero is fine) and some components for interfacing with peripherals. Check the PNG schematic for explanation
+ALL apps to be installed with PIP3 for Python3 compatibility
+Make sure to copy mypi.py to same directory as maia.py
+
+************************************************************
+For  7" RPi TFT:
+    the screensaver can be disabled by installing: sudo apt install xscreensaver
+
+    Control of brightness (0-255):
+    sudo sh -c 'echo "128" > /sys/class/backlight/rpi_backlight/brightness'
+    Python code:
+    subprocess.run(['sudo','sh','-c','echo ' + str(RPibrightness) + ' > /sys/class/backlight/rpi_backlight/brightness'])
+***************************************************************************
+Installation of PiTFT display driver from AdaFruit
+cd ~
+wget https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/adafruit-pitft.sh
+chmod +x adafruit-pitft.sh
+sudo ./adafruit-pitft.sh
+
+Answer n to console
+Answer y to HDMI mirroring
+Answer y to REBOOT
+
+PiTFT to be configured with HDMI mirroring and autostart of Python-file after desktop LXDE load:
+
+edit startfile without sudo: 
+nano ~/.config/lxsession/LXDE-pi/autostart
+
+@sudo /usr/bin/python3 /home/pi/maia.py
+#@thonny /home/pi/maia.py
+#@python3 /home/pi/maia.py
+@xset s noblank # disable blanking
+@xset s off
+@xset s -dpms
+
+PiTFT Display commands in Python:
+import RPi.GPIO as GPIO
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(18, GPIO.OUT)
+pwm = GPIO.PWM(18, 1000)
+pwm.start(50)
+
+test PiTFT display on/off from command prompt:
+sudo sh -c 'echo "0" > /sys/class/backlight/soc\:backlight/brightness'
+sudo sh -c 'echo "1" > /sys/class/backlight/soc\:backlight/brightness'
+
+********************************
+
+For debugging this procedure (method 2) can be used in order to read the background shell
+https://learn.sparkfun.com/tutorials/how-to-run-a-raspberry-pi-program-on-startup/all
