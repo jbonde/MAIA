@@ -1,7 +1,9 @@
 # Installation notes
 Guide and tips for installation
-## Server
-The server is based on a standard RPi (Zero is fine) and some components for interfacing with peripherals. Check the PNG schematic for explanation
+
+## Client
+Code for client program is maia.py
+
 ALL apps to be installed with PIP3 for Python3 compatibility
 Make sure to copy mypi.py to same directory as maia.py
 
@@ -51,3 +53,11 @@ sudo sh -c 'echo "1" > /sys/class/backlight/soc\:backlight/brightness'
 
 For debugging this procedure (method 2) can be used in order to read the background shell
 https://learn.sparkfun.com/tutorials/how-to-run-a-raspberry-pi-program-on-startup/all
+
+## Server
+The server is based on a standard RPi (Zero is fine) and some components for interfacing with peripherals. Check the PNG schematic for explanation
+MAIAserver.py
+
+## Simulator
+
+MAIAsimulator.py
