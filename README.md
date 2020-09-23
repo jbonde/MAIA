@@ -1,6 +1,6 @@
 # MAIA - a MAritime Information Application
 
-MAIA is a maritime information and utility tool to be installed on board as a supplement to plotters or mobile navigation devices in order to optimize overview of yacht data from instruments and GPS but also for providing additional information and features. The system consist of a server that picks up and transmits data and a client program that can run on as many units as desired on board.
+MAIA is a maritime information and utility tool to be installed on board as a supplement to plotters or mobile navigation devices in order to optimize overview of yacht data from instruments and GPS but also for providing additional information and features. The system consist of a server that picks up and transmits data and a display client that can run on as many units as desired on board.
 
 The client software is designed for small touch screens and all menus provide an intuitive user interface which enables quick and easy access to information during sailing through a simple layout that is clearly visible even on the smallest screens. So for those carrying older instruments on board and use tablets for navigation, the MAIA system can add the extra overview and flexibility that new and expensive systems have.
 
