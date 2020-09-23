@@ -4,55 +4,78 @@ Guide and tips for installation
 ## Client
 Code for client program is maia.py
 
-ALL apps to be installed with PIP3 for Python3 compatibility
+************   DEPENDENCIES    *******************
+
+guizero: Check that you have the newest version at https://lawsie.github.io/guizero/#upgrading-guizero
 Make sure to copy mypi.py to same directory as maia.py
 
-************************************************************
-For  7" RPi TFT:
-    the screensaver can be disabled by installing: sudo apt install xscreensaver
+For MAIAserver these should be installed as well in order to support weather data sensors:
+    pip3 install Adafruit_DHT
+    pip3 install BMP280
 
-    Control of brightness (0-255):
+ALL dependencies to be installed with PIP3 for Python3 compatibility
+
+***************   DISPLAYS  **********************************
+
+The screensaver can be disabled by installing: 
+    sudo apt install xscreensaver
+Goto desktop and open the new screensaver. Preferences/Display Modes/Mode: "Disable Screen Saver" will keep the screen on at all times
+
+7" RPi TFT:    
+    Control of brightness (0-255) from command line eg set to 50%:
     sudo sh -c 'echo "128" > /sys/class/backlight/rpi_backlight/brightness'
-    Python code:
+
+    Same as Python code in MAIA if RPibrightness=128:
     subprocess.run(['sudo','sh','-c','echo ' + str(RPibrightness) + ' > /sys/class/backlight/rpi_backlight/brightness'])
-***************************************************************************
-Installation of PiTFT display driver from AdaFruit
-cd ~
-wget https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/adafruit-pitft.sh
-chmod +x adafruit-pitft.sh
-sudo ./adafruit-pitft.sh
 
-Answer n to console
-Answer y to HDMI mirroring
-Answer y to REBOOT
+Adafruit PiTTFT:
+    Installation of PiTFT display driver from AdaFruit
+    cd ~
+    wget https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/adafruit-pitft.sh
+    chmod +x adafruit-pitft.sh
+    sudo ./adafruit-pitft.sh
 
-PiTFT to be configured with HDMI mirroring and autostart of Python-file after desktop LXDE load:
+    Answer n to console
+    Answer y to HDMI mirroring
+    Answer y to REBOOT
 
+    PiTFT to be configured with HDMI mirroring and autostart of Python-file after desktop LXDE load:
+
+Test PiTFT display on/off from command prompt:
+    sudo sh -c 'echo "0" > /sys/class/backlight/soc\:backlight/brightness'
+    sudo sh -c 'echo "1" > /sys/class/backlight/soc\:backlight/brightness'
+
+PiTFT Display commands in Python. Enable Pulse Width Modulation:
+    import RPi.GPIO as GPIO
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(18, GPIO.OUT)
+    pwm = GPIO.PWM(18, 1000)
+    pwm.start(50)
+
+***************   AUTOSTART MAIA IN GUI   *****************************************
+
+Option 1 (seems to be the best method)
+mkdir /home/pi/.config/autostart
+nano /home/pi/.config/autostart/maia.desktop
+    [Desktop Entry]
+    Type=Application
+    Name=MAIA
+    Exec=/usr/bin/python3 /home/pi/maia.py
+
+Option 2 (tested but disables the RPi desktop)
 edit startfile without sudo: 
 nano ~/.config/lxsession/LXDE-pi/autostart
-
-@sudo /usr/bin/python3 /home/pi/maia.py
-#@thonny /home/pi/maia.py
-#@python3 /home/pi/maia.py
-@xset s noblank # disable blanking
-@xset s off
-@xset s -dpms
-
-PiTFT Display commands in Python:
-import RPi.GPIO as GPIO
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(18, GPIO.OUT)
-pwm = GPIO.PWM(18, 1000)
-pwm.start(50)
-
-test PiTFT display on/off from command prompt:
-sudo sh -c 'echo "0" > /sys/class/backlight/soc\:backlight/brightness'
-sudo sh -c 'echo "1" > /sys/class/backlight/soc\:backlight/brightness'
-
-********************************
+    @sudo /usr/bin/python3 /home/pi/maia.py
+    #@thonny /home/pi/maia.py
+    #@python3 /home/pi/maia.py
+    @xset s noblank # disable blanking
+    @xset s off
+    @xset s -dpms
 
 For debugging this procedure (method 2) can be used in order to read the background shell
 https://learn.sparkfun.com/tutorials/how-to-run-a-raspberry-pi-program-on-startup/all
+
+********************************
 
 ## Server
 The server is based on a standard RPi (Zero is fine) and some components for interfacing with peripherals. Check the PNG schematic for explanation
