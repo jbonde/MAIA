@@ -23,12 +23,14 @@ DES (Destination) features a Waypoint selector/editor and shows distance/bearing
 
 DASH will take you to the dashboard which is coded in a "B&G" style with a left and right column showing live data from instruments. The center is a compass rose with four coloured lines representing COG, BRG, TWD and AWA. AWA will change color between red and green according to angle. Tapping the display will change the view from "North-up" to "Course-up".
 
+MOB. A "Man Over Board" is placed centrally in the Main menu in order to have fast registration of coordinates in an emergency situation.
+
 The * (sub menu)  section gives access to the Timer- and Race modules and Weather data from the temperature, air pressure and humidity sensors as well as system information. Settings can also be reached from this section eg if you would like a layout with black background or dim the display during night passages.
 
 For further insight to the general flow and sub-menus please check MAIA_functionality.png and the MAIA.png flowchart 
 
 ## Data acquisition
-Data is transmitted from server and picked up by clients via UDP on a standard LAN either wired or wireless of your choice in order to service as many display configurations as desired on board. Instrument data are acquired and submitted from the MAIA server (see MAIAserver.py) or any other device capable of broadcasting standard NMEA-sentences via UDP. For full data feed the MAIAserver with weather sensors is required.
+Instrument data are acquired and submitted from the MAIA server (see MAIAserver.py) or any other device capable of broadcasting standard NMEA-sentences via UDP. For full data feed the MAIAserver with weather sensors is required. The data can picked up by clients from a standard LAN of your choice in order to service as many display configurations as desired on board.
 
 ## Testing
 The MAIA application can be tested by running MAIAsimulator.py on a separate RPi connected to same LAN. This will take you on a virtual but realistic trip around the Danish island Anholt in a fairly stable westerly breeze. If a trip is started in MAIA at the same time as launching the simulator you can after some time fetch a date/time stamped CSV-file which can be uploaded directly to Google maps for testing the log data that was recorded. A full trip around the island takes 6 hours (check the screen shot MAIA_simulator.png). So if desired you can set up two RPi's right away and get a grasp of how it works as long as they are on the same network. But please read the installation notes first. 
