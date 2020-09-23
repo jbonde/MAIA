@@ -13,7 +13,7 @@ UDPport=2000
 
 # Standard NMEA string received directly from GPS connected to USB-port or via NMEA0183
 RMC="225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68"
-'''
+'''        Example:
            225446       Time of fix 22:54:46 UTC
            A            Navigation receiver warning A = OK, V = warning
            4916.45,N    Latitude 49 deg. 16.45 min North
@@ -63,7 +63,7 @@ AWSmin=1 #Max wind velocity knots
 depth=4.5
 STW=1 # Speed through water
 
-# MET data
+# Weather data
 tempin=18.3
 pressure=1003
 humidity=78
@@ -78,7 +78,7 @@ def UDPmessage(UDPstring):
     udp.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     udp.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
     udp.sendto(UDPbytes, (UDPaddress, UDPport))
-    #print ("UDP sent (" + str(UDPport) + ")" + str(UDPstring))
+    print ("UDP sent (" + str(UDPport) + ")" + str(UDPstring))
 
 
 def true2apparent():
@@ -176,7 +176,7 @@ while True:
     # Create GPS position
     latprev=lat
     lonprev=lon
-    RMC="$GPRMC,"+timenow+",A," + str(latdms) +",N," + str(londms)+ ",E,"+str('{:3.1f}'.format(SOG))+","+str('{:3.1f}'.format(COG))+","+datenow+",004.3,E*68"
+    RMC="$GPRMC,"+timenow+",A," + str(latdms) +",N," + str(londms)+ ",E,"+str('{:3.1f}'.format(SOG))+","+str('{:3.1f}'.format(COG))+","+datenow
 
     # Speed and TWS adjustments before next GPS update
     if SOGup==True:
@@ -197,7 +197,7 @@ while True:
 
     # Send Wind data
     true2apparent()
-    VWR="$IIVWR," + str(abs(AWA)) + "," + str(AWD) + "," + str(AWS) + ",N,,,," #Relative Wind Speed and Angle
+    VWR="$IIVWR," + str(abs(AWA)) + "," + str(AWD) + "," + str(AWS) + ",N" #Relative Wind Speed and Angle
     
     # Wind speed adjustments before next update
     if AWSup==True:
@@ -214,12 +214,12 @@ while True:
         depth=depth+0.1
     else:
         depth=depth-0.1
-    DBT="$IIDBT,0076.5,f,"+str(depth)+",M,," # Depth Below Transducer
+    DBT="$IIDBT,0076.5,f,"+str(depth)+",M" # Depth Below Transducer
 
     # Create other instrument data
     STW=abs(SOG-random.randint(0, 3)) #Make a random adjustment for current
-    VHW="$IIVHW,,,"+str(STW)+",N,," # Water speed and heading
-    WEA = "$GPWEA," + str(tempin) + "," + str(tempout) + "," + str(pressure) + "," + str(humidity) + "," + " " 
+    VHW="$IIVHW,,,"+str(STW)+",N" # Water speed and heading
+    WEA = "$GPWEA," + str(tempin) + "," + str(tempout) + "," + str(pressure) + "," + str(humidity)
     UDPsentences=[RMC,DBT,VHW,VWR,MTW,WEA]
     for nmea in range(len(UDPsentences)):
         UDPmessage(UDPsentences[nmea])

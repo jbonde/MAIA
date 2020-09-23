@@ -1,8 +1,8 @@
 #!/usr/bin/python
 # Maritime application for use with touch displays
-# Installation and configuration notes at bottom of code
+# Installation and configuration guide at https://github.com/jbonde/MAIA/blob/master/installation
 
-from guizero import App, Text, PushButton, Window, ListBox, Box, Picture,Drawing
+from guizero import App, Text, PushButton, Window, ListBox, Box, Picture, Drawing
 import os
 import time, datetime
 from time import sleep
@@ -21,7 +21,7 @@ gpioimport=False
 if OSplatform=="Windows":
     workdir="C:\\"
 elif OSplatform=="Linux": # Assuming RPi as hardware
-    import RPi.GPIO as GPIO # used for dimming PiTFT display and turning on buzzer if installed with current display
+    import RPi.GPIO as GPIO # used for dimming PiTFT display and controlling buzzer if installed with current display
     GPIO.setmode(GPIO.BCM)
     gpioimport=True
     try:
@@ -29,7 +29,7 @@ elif OSplatform=="Linux": # Assuming RPi as hardware
     except:
         print("mypi not installed")
 
-appver="1.4.0" # for displaying software version in the status window
+appver="1.5.0" # for displaying software version in the status window
 UDPmode=True # fetching sensor and GPS data via UDP if True
 
 display_brightness=100 # BRIGHTNESS percentage %
@@ -58,8 +58,8 @@ but_height=4
 but_text_size=35
 but_text_medsize=80
 but_text_bigsize=150
-key_width=2 #Keyboard buttons
-key_height=1
+key_width=None #Keyboard buttons
+key_height=None
 posmode=True # black text n white back. Opposite if False
 colorfor=None #"black"
 colorback=None #"white"
@@ -190,8 +190,8 @@ def ynmenu(title,action):
 def single_show(button_clicked):
     global mode, counting
     # Generic function opening all windows with a single data feed
-    mode=button_clicked
-    print("mode = " + mode)
+    mode=str(button_clicked)
+    print("mode = " + str(mode))
     if mode=="stop":
         counting=0
     but_single.text=" "
@@ -205,8 +205,9 @@ def single_hide():
         display_adjust("off")
     else:
         mode=" "
-    but_single.text_size=but_text_bigsize
+    but_single.text_size=but_text_bigsize # reset properties
     but_single.text_color=colorfor
+    but_single.text=" "
     window_single.hide()
 
 def keyboard(txt): #handling keyboard inputs
@@ -216,8 +217,8 @@ def keyboard(txt): #handling keyboard inputs
         txt=""
         if mode=="wptnew":
             mode="wptnewlat"
-            londes=None
-            latdes=None
+            londes=0
+            latdes=0
 #            num_title.value="Latitude (deg.dec)"
             num_input.value=""
 #            nums=None
@@ -241,7 +242,7 @@ def numboard(txt): #handling numboard inputs
     window_num.show()
     if txt=="OK":
         if mode=="wptnewlon":
-            londes=int(float(nums))
+            londes=float(nums)
             list_wpts.append(dest) # add new destination to list box
             wptlist.append(dest) # add new destination to box-array
             wpts.append([dest,latdes,londes]) # add new destination to wpt-array
@@ -251,16 +252,16 @@ def numboard(txt): #handling numboard inputs
             nums=""
             window_num.hide()
         if mode=="wptnewlat":
-            latdes=int(float(nums))
+            latdes=float(nums)
             mode="wptnewlon"
 #            num_title.value="Longitude (deg.dec)"
-            window_num.show()
+            #window_num.show()
         if mode=="down":
             downcount=int(float(nums)*60)
             single_show(mode)
             window_num.hide()
-        else:
-            window_num.hide()
+        #else:
+        #    window_num.hide()
         nums=""
         txt=""
     if txt=="del":
@@ -336,8 +337,8 @@ def timer_update():
     global navlog,DTW,BRG,AVSlog,AVSlat,AVSlon
     global logfile_created,UDPupdate,colorfor,colorback
 
-#   Generic function for updating single display depending on function selected in menus
-    but_single.text=mode
+#   Updating single display depending on function selected in menus
+    but_single.text=str(mode) # Show mode if there is no data
     counting=counting+1 #seconds
     UDPupdate-=1 #counting down UDP update if not reset by UDP loop
     ms=time.strftime("%M:%S", time.gmtime(counting)) #stop watch display as M+S
@@ -381,26 +382,26 @@ def timer_update():
                 log_update() # append current log data to log file
                 tripcount=0
     if mode=="tIN":
-        if BMP280import==True:
-            tempin = '{:4.1f}'.format(measurebmp.get_temperature())
+        #if BMP280import==True:
+        #    tempin = '{:4.1f}'.format(measurebmp.get_temperature())
         but_single.text=str(tempin) # + " °C"
     if mode=="hPa":
-        if BMP280import==True:
-            pressure = '{:4.0f}'.format(measurebmp.get_pressure())
+        #if BMP280import==True:
+        #    pressure = '{:4.0f}'.format(measurebmp.get_pressure())
         but_single.text=str(pressure) # + " hPa"  
     if mode=="tOUT":
-        if DHT22import==True:
+        #if DHT22import==True:
 #            DHT_SENSOR = Adafruit_DHT.DHT22
 #            DHT_PIN = 4
-            humidity, tempout = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
-            tempout = '{:4.1f}'.format(tempout)
+        #    humidity, tempout = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
+        #    tempout = '{:4.1f}'.format(tempout)
         but_single.text=str(tempout) # + " °C"
     if mode=="HUM":
-        if DHT22import==True:
+        #if DHT22import==True:
 #            DHT_SENSOR = Adafruit_DHT.DHT22
 #            DHT_PIN = 4
-            humidity, tempout = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
-            humidity = '{:2.0f}'.format(humidity)
+        #    humidity, tempout = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
+        #    humidity = '{:2.0f}'.format(humidity)
         but_single.text=str(humidity) + " %"     
     if mode=="dash":
         dashboard_update()
@@ -1382,9 +1383,9 @@ print("Resolution is " + str(RES))
 # Single data menu
 window_single = Window(app, title="single")
 window_single.tk.attributes("-fullscreen", True)
-window_single.hide()
-but_single = PushButton(window_single, command=single_hide, text=mode, width="fill", height="fill")
+but_single = PushButton(window_single, command=single_hide, text=str(mode), width="fill", height="fill")
 but_single.text_size=but_text_bigsize
+window_single.hide()
 
 #Keypad
 window_key = Window(app, title="Keypad")
@@ -1393,11 +1394,12 @@ window_key.text_size=but_text_size
 window_key.hide()
 box_key_title = Box(window_key, width="fill", align="top")
 key_title = Text(box_key_title, text="Title")
-key_title.text_size=but_text_medsize
+key_title.text_size=but_text_size
 box_key_input = Box(window_key, width="fill", align="top")
 key_input = Text(box_key_input, align="left")
-key_input.text_size=but_text_medsize
-
+key_input.text_size=but_text_size
+key_width=int(screen_width/300)
+key_height=int(screen_height/800)
 box_keys1 = Box(window_key, width="fill", align="top")
 box_keys = box_keys1 # Helps moving lines with buttons for other configurations
 but_key_A = PushButton(box_keys, lambda:keyboard("A"),text="A", width=key_width, height=key_height, align="left")
@@ -1439,7 +1441,7 @@ but_key_Z = PushButton(box_keys, lambda:keyboard("Z"),text="Z", width=key_width,
 but_key_at = PushButton(box_keys, lambda:keyboard("Æ"),text="Æ", width=key_width, height=key_height, align="left")
 but_key_at = PushButton(box_keys, lambda:keyboard("Ø"),text="Ø", width=key_width, height=key_height, align="left")
 but_key_dot = PushButton(box_keys, lambda:keyboard("Å"),text="Å", width=key_width, height=key_height, align="left")
-but_key_dot = PushButton(box_keys, lambda:keyboard(" "),text=" ", width=key_width, height=key_height, align="left")
+but_key_dot = PushButton(box_keys, lambda:keyboard("del"),text="<", width=key_width, height=key_height, align="left")
 but_key_ok = PushButton(box_keys, lambda:keyboard("OK"),text="OK", width=key_width, height=key_height, align="left")
 
 #numpad
@@ -1768,64 +1770,7 @@ app.repeat(1000, GPSread) #read data from GPS 1/1 sec
 #Run the application
 app.display()
 
+# Installation and configuration notes at https://github.com/jbonde/MAIA/blob/master/installation
 
-#Installation and configuration notes
-
-'''
-ALL apps to be installed with PIP3 for Python3 compatibility
-Make sure to copy mypi.py to same directory as maia.py
-
-************************************************************
-For  7" RPi TFT:
-    the screensaver can be disabled by installing: sudo apt install xscreensaver
-
-    Control of brightness (0-255):
-    sudo sh -c 'echo "128" > /sys/class/backlight/rpi_backlight/brightness'
-    Python code:
-    subprocess.run(['sudo','sh','-c','echo ' + str(RPibrightness) + ' > /sys/class/backlight/rpi_backlight/brightness'])
-***************************************************************************
-Installation of PiTFT display driver from AdaFruit
-cd ~
-wget https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/adafruit-pitft.sh
-chmod +x adafruit-pitft.sh
-sudo ./adafruit-pitft.sh
-
-Answer n to console
-Answer y to HDMI mirroring
-Answer y to REBOOT
-
-PiTFT to be configured with HDMI mirroring and autostart of Python-file after desktop LXDE load:
-
-sudo apt-get install unclutter # install unclutter in order to remove cursor
-
-edit startfile without sudo: 
-nano ~/.config/lxsession/LXDE-pi/autostart
-
-@sudo /usr/bin/python3 /home/pi/maia.py
-#@thonny /home/pi/maia.py
-#@python3 /home/pi/maia.py
-@xset s noblank # disable blanking
-@xset s off
-@xset s -dpms
-@unclutter -idle 0 #removes cursor
-
-PiTFT Display commands in Python:
-import RPi.GPIO as GPIO
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(18, GPIO.OUT)
-pwm = GPIO.PWM(18, 1000)
-pwm.start(50)
-
-test PiTFT display on/off from command prompt:
-sudo sh -c 'echo "0" > /sys/class/backlight/soc\:backlight/brightness'
-sudo sh -c 'echo "1" > /sys/class/backlight/soc\:backlight/brightness'
-
-********************************
-
-For debugging this procedure (method 2) can be used in order to read the background shell
-https://learn.sparkfun.com/tutorials/how-to-run-a-raspberry-pi-program-on-startup/all
-
-
-'''
 
 #EOF

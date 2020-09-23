@@ -19,7 +19,7 @@ DHT_PIN = 4
 # Serial communication with GPS and/or NMEA0183 input
 port1 = "/dev/ttyUSB0"  # USB serial (Adafruit GPS etc)
 port2 = "/dev/ttyUSB1"  # USB serial (Adafruit GPS etc)
-port = "/dev/ttyACM0"  # RPi with BS-708 receiver at USB port
+port = "/dev/ttyACM0"  # RPi Zero with BS-708 receiver at USB port
 port4 = "/dev/ttyACM1"  # RPi with BS-708 receiver at USB port
 port5 = "/dev/ttyAMA0"  # RPi Zero PIN 10
 port6 = "/dev/ttyS0"    # RPi 3 + Zero PIN 10
@@ -66,6 +66,7 @@ def UDPmessage(UDPstring):
     udp.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     udp.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
     udp.sendto(UDPbytes, (UDPaddress, UDPport))
+    print ("UDP string:" +str(UDPstring))
     print ("UDPbytes sent:" +str(UDPbytes))
 
 def WeatherSensors():
@@ -95,6 +96,7 @@ while True:
     UDPmessage(WEA)
     sleep(0.5)
     gpsread = ser.readline().decode('ascii', errors='replace')
+    #print(gpsread)
     #print ("GPS data: " + str(gpsread))
     header = gpsread[3:6]
     if header=="RMC":
