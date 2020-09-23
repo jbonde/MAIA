@@ -23,7 +23,7 @@ DES (Destination) features a Waypoint selector/editor and shows distance/bearing
 
 DASH will take you to the dashboard which is coded in a "B&G" style with a left and right column showing live data from instruments. The center is a compass rose with four coloured lines representing COG, BRG, TWD and AWA. AWA will change color between red and green according to angle. Tapping the display will change the view from "North-up" to "Course-up".
 
-MOB. A "Man Over Board" is placed centrally in the Main menu in order to have fast registration of coordinates in an emergency situation.
+MOB. A "Man Over Board" button is placed centrally in the Main menu in order to have fast registration of coordinates in an emergency situation.
 
 The * (sub menu)  section gives access to the Timer- and Race modules and Weather data from the temperature, air pressure and humidity sensors as well as system information. Settings can also be reached from this section eg if you would like a layout with black background or dim the display during night passages.
 
