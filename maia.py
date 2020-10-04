@@ -31,7 +31,7 @@ elif OSplatform=="Linux": # Assuming RPi as hardware
 
 appver="1.5.0" # for displaying software version in the status window
 UDPmode=True # fetching sensor and GPS data via UDP if True
-
+SERmode=True # If GPS is connected to display and instrument data is fetched via UDP
 display_brightness=100 # BRIGHTNESS percentage %
 
 # Clock
@@ -99,6 +99,7 @@ GPSsim=False #GPS simulator mode
 #Seatalk 1 variables
 DEP=0 #Depth
 TWS=0 #True wind speed
+TWSmax=0 # Max wind speed
 TWD=0 #True wind direction
 TWA=0 #True wind angle to COG
 AWS=0 #Apparent wind speed
@@ -118,6 +119,20 @@ UDPupdate=UDPupdatedef # Counting time to wait for UDP string
 metpng="met.png"
 UDP_IP = ""
 UDP_PORT = 2000
+
+# Serial setup
+if SERmode==True:
+    import serial
+    # Serial communication with GPS and/or NMEA0183 input
+    port1 = "/dev/ttyUSB0"  # USB serial (Adafruit GPS etc)
+    port2 = "/dev/ttyUSB1"  # USB serial (Adafruit GPS etc)
+    port = "/dev/ttyACM0"  # RPi4 or RPi0 with BS-708 receiver at USB port
+    port4 = "/dev/ttyACM1"  # RPi with BS-708 receiver at USB port
+    port5 = "/dev/ttyAMA0"  # RPi Zero PIN 10
+    port6 = "/dev/ttyS0"    # RPi 3 + Zero PIN 10
+    portbaud=9600 # Baudrate: 9600 for GPS, 4800 for NMEA0183
+    porttimeout=1
+    ser = serial.Serial(port, baudrate = portbaud, timeout=porttimeout)
 
 #metpng="smb://192.168.0.105/PiShare/met.png"
 
@@ -170,23 +185,43 @@ logfile_created=False
 
 pwm=None # Pulse width modulation for controlling PiTFT brightness if used
 
-# ****************    MAIN widgets  *******************************
+# ****************    Interaction widgets  *******************************
 
-def ynmenu(title,action):
-    # generic y/n buttons
-    window_ynmenu = Window(app, title="ynmenu")
-    window_ynmenu.tk.attributes("-fullscreen", True)
+# YES/NO interaction
+def ynmenu(ynaction):
+    global mode
+    mode=ynaction
     window_ynmenu.bg=colorback
     window_ynmenu.text_color=colorfor
-    window_ynmenu.show
-    ynbut_width=int(screen_width/65)
-    text = Text(window_ynmenu, text="Do you really want to " + str(title) + " ?", width="fill", size=but_text_size)
-    but_ynmenu = PushButton(window_ynmenu, command=action, text="YES", width=ynbut_width, height=but_height, align="left")
-    but_ynmenu.text_size=but_text_size
-    but_ynmenu.text_color=but_race_color
-    but_noynmenu = PushButton(window_ynmenu, command=window_ynmenu.hide, text="NO", width=ynbut_width, height=but_height, align="right")
-    but_noynmenu.text_size=but_text_size
+    text_ynmenu.value = "Do you really want to " + str(ynaction) + " ?"
+    window_ynmenu.show()
 
+def yesaction(): # Action to be performed if YES button is clicked
+    global SERmode
+    if mode=="quit":
+        quitting()
+    if mode=="reboot":
+        reboot()
+    if mode=="delete the waypoint":
+        wpt_delete()
+    if mode=="connect gps":
+        SERgps("yes")
+    
+def noaction(): # Action to be performed if NO button is clicked
+    if mode=="connect gps":
+        SERgps("no")
+    else:
+        window_ynmenu.hide()
+
+def SERgps(answer):
+    global SERmode
+    if answer=="yes":
+        SERmode=True
+    else:
+        SERmode=False
+    window_ynmenu.hide()
+
+# Show single data  
 def single_show(button_clicked):
     global mode, counting
     # Generic function opening all windows with a single data feed
@@ -210,6 +245,7 @@ def single_hide():
     but_single.text=" "
     window_single.hide()
 
+# Keyboards
 def keyboard(txt): #handling keyboard inputs
     global dest,mode,nums,londes,latdes
     keys=key_input.value #read text in box
@@ -284,6 +320,7 @@ def numboard(txt): #handling numboard inputs
 #        window_num.hide()   
 
 # *************************   TIMERS   *********************************
+
 def UTZ_set(zone): #Adjusting time difference according to UTC
     global TIMEZ
     TIMEZ=TIMEZ+zone
@@ -507,47 +544,7 @@ def display_on():
     display_brightness=70
     #pwm.ChangeDutyCycle(display_brightness)
     setsave()
-'''    
-def display_off():
-    global display_brightness
-    if display_brightness>0:
-        display_brightness=0
-    else:
-        display_brightness=70
-    pwm.ChangeDutyCycle(display_brightness)
-    single_show("BO")
-    setsave()
 
-def display_up():
-    global display_brightness
-    if display_brightness==1:
-        display_brightness=0
-    if display_brightness<91:
-        display_brightness=display_brightness+10
-        pwm.ChangeDutyCycle(display_brightness)
-    setsave()
-
-def display_down():
-    global display_brightness
-    if display_brightness>9:
-        display_brightness=display_brightness-10
-        if display_brightness==0:
-            display_brightness=1        
-        pwm.ChangeDutyCycle(display_brightness)
-    setsave()
-        
-def display_100():
-    global display_brightness
-    display_brightness=100
-    pwm.ChangeDutyCycle(display_brightness)
-    setsave()
-
-def display_auto():
-    global display_brightness
-    display_brightness=100
-    pwm.ChangeDutyCycle(display_brightness)
-    setsave()
-'''
 def display_adjust(bri):
     # function to adjust display brightness according to display type
     global display_brightness,pwm
@@ -563,9 +560,9 @@ def display_adjust(bri):
         single_show("BO")
         
     if bri=="+":
-        if display_brightness==1:
-            display_brightness=0
         if display_brightness<91:
+            if display_brightness==1:
+                display_brightness=10
             display_brightness=display_brightness+10
 
     if bri=="-":
@@ -862,9 +859,9 @@ def GPSread():
     global GPSUTC,GPSdate,GPSspeed,GPScourse,GPSNS,GPSEW,SOG,COG
     global ser,gpsdata,UTZ,UTZhours,TIMEZ,UTCOS,GPSNS,GPSEW,dayname,UDPupdate,daynumber
     global latnow,lonnow,latnowdms,lonnowdms,londegminmin,latdegminmin
-    if UDPmode==False: 
+    if SERmode==True:  # Fetch GPS data from USB
         gpsdata = ser.readline().decode('ascii', errors='replace') #wait for each full line        
-    else:    
+    else:   # Fetch GPS data from UDP
         gpsdata=UDPstring
     if len(str(gpsdata))>8:
         header = gpsdata[3:6] # slicing out the header information (3 letters needed)
@@ -899,8 +896,8 @@ def GPSread():
         
         monthname=calendar.month_abbr[int((GPSdate)[2:4])]
         daynames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        daynumber=calendar.weekday((int(str(GPSdate)[4:])),int(str(GPSdate)[2:4]),int(str(GPSdate)[0:2]))
-        dayname=daynames[daynumber]
+#        daynumber=calendar.weekday((int(str(GPSdate)[4:])),int(str(GPSdate)[2:4]),int(str(GPSdate)[0:2]))
+#        dayname=daynames[daynumber]
 
             #Check system clocks:   timedatectl status           
             #Format example: sudo date --set="2015-09-30 10:05:59"            
@@ -913,7 +910,7 @@ def GPSread():
 #            os.system('sudo hwclock --systohc') #Set hardware clock
 
 def UDPread():
-    global UDPstring,tempin,tempout,pressure,humidity,UDPaddress
+    global UDPstring,tempin,tempout,pressure,humidity,UDPaddress,TWSmax
     global DEP,TWS,TWD,TWA,TSE,STW,AWA,AWS #Seatalk1
 
     while True:
@@ -957,6 +954,8 @@ def UDPread():
                 AWA_rad=0.1
             SOGms=SOG*0.514444 #Speed over ground in m/s
             TWS=math.sqrt(math.pow(AWS,2)+math.pow(SOGms,2)-2*AWS*SOGms*math.cos(AWA_rad)) # True wind speed
+            if TWS>TWSmax:
+                TWSmax=TWS
             if TWS<0.1: #Avoid 0 division 
                 TWS=0.1
             if AWD=="R":
@@ -979,11 +978,11 @@ def UDPread():
             VHWarray=UDPstring.split(",") #make array according to comma-separation in string
             STW=(VHWarray[3])
 
-def navigate(navii):
-    #Run when WPT button is clicked in Navigation menu
+def wpt_nav(wpt_mode):
+    # Show Waypoint selector when WPT button is clicked in Navigation menu
     global wptindex,wpts,wptlist,wptscsv,dest,list_wpts,wpts_text_index,latdesdms,latNS,londesdms,lonEW
     dirpath = os.getcwd()
-    with open(r'waypoints.csv', encoding="latin-1", newline='') as csvfile: #Open CSV file with waypoints. r is 'raw string' before the path
+    with open('waypoints.csv', encoding='utf-8') as csvfile: #Open CSV file with waypoints. r is 'raw string' before the path
         list_wpts.clear() #Clearing the box for old wpts each time page is loaded
         wpts = list(csv.reader(csvfile)) #create array with waypoints read from csv file
 #        wpts=wptscsv #sort the array alphabetically???
@@ -992,13 +991,42 @@ def navigate(navii):
     wptlist=list_wpts.items #Create a support array only with the items loaded to the list box (column 0 in the CSV file)in order to look up index numbers etc
     if dest !="":
         wpts_text_index.value=dest + " " + str(latdesdms) + str(latNS) + " " + str(londesdms) + str(lonEW) #Show destination info at top of menu
-    if navii=="nav":
+    if wpt_mode=="nav": # If called from DEP menu
         but_wpts_edit.text="NEW" # change text in button
         wpts_text_index.value="Select destination"
-    if navii=="del":
+    if wpt_mode=="del": # If called from SET menu
         but_wpts_edit.text="DEL" # change text in button
         wpts_text_index.value="Delete waypoint"
     window_wpts.show()
+
+def wpt_edit(): # Control button text according to choice in order to create new or delete waypoint
+    global mode
+    if but_wpts_edit.text=="NEW":
+        mode="wptnew"
+        key_title.value="New waypoint"
+        key_input.value="" # Delete old text if any
+        window_key.show()
+    if but_wpts_edit.text=="DEL":
+        mode="wptdel"
+        ynmenu("delete the waypoint")
+        
+def wpt_delete(): #Delete waypoint
+    but_wpts_edit.text=="DEL"
+    wptindex=wptlist.index(dest)
+#    print(wptindex)
+#    print(wpts)
+#    print(len(wptlist))
+    print("Deleted " + str(wpts[wptindex]))   
+    del wpts[wptindex]
+    # Write updated array to file
+    with open('waypoints.csv', "w", encoding='utf-8') as f:
+        for w in range(len(wptlist)-1):
+            f.write(str(wpts[w][0]) + "," + str(wpts[w][1]) + "," + str(wpts[w][2]) +"\n")
+    window_wpts.hide()
+    window_ynmenu.hide()
+
+def wpt_new(): # New waypoint
+    but_wpts_edit.text=="NEW"
 
 def destination(): #Select waypoint
     # Find lon+lat when destination is clicked in list box
@@ -1012,16 +1040,6 @@ def destination(): #Select waypoint
     londesdms=dec2dms(londes) #make a dms-version
     quadrant()
     wpts_text_index.value=dest + " " + str(latdesdms) + str(latNS) + " " + str(londesdms) + str(lonEW) #Show destination info at top of menu    
-
-def wpt_edit(): #create new waypoint
-    global mode
-    if but_wpts_edit.text=="NEW":
-        mode="wptnew"
-        key_title.value="New waypoint"
-        window_key.show()
-    if but_wpts_edit.text=="DEL":
-        mode="wptdel"
-        ynmenu("delete the waypoint",quitting)
 
 def quadrant():
     #Determine which quadrant we are going to
@@ -1350,8 +1368,9 @@ def menu_status_soft():
     status_list_column.append("ser port " + str(port))
     status_list_column.append("UDPport " + str(UDP_PORT))
     status_list_column.append("gpioimport " + str(gpioimport))
-    status_list_column.append("BMP280 " + str(BMP280import))
+#    status_list_column.append("BMP280 " + str(BMP280import))
     status_list_column.append("TTG " + str(TTG))
+    status_list_column.append("TWSmax " + str(TWSmax)[0:4])
     status_list_column.append("AVS01 " + str(AVS01))
     status_list_column.append("AVS10 " + str(AVS10))
     status_list_column.append("AVS30 " + str(AVS30))
@@ -1386,6 +1405,20 @@ window_single.tk.attributes("-fullscreen", True)
 but_single = PushButton(window_single, command=single_hide, text=str(mode), width="fill", height="fill")
 but_single.text_size=but_text_bigsize
 window_single.hide()
+
+# Yes/No menu
+window_ynmenu = Window(app, title="ynmenu")
+window_ynmenu.tk.attributes("-fullscreen", True)
+window_ynmenu.bg=colorback
+window_ynmenu.text_color=colorfor
+window_ynmenu.hide()
+ynbut_width=int(screen_width/65)
+text_ynmenu = Text(window_ynmenu, text="?", width="fill", size=but_text_size)
+but_ynmenu = PushButton(window_ynmenu, command=yesaction, text="YES", width=ynbut_width, height=but_height, align="left")
+but_ynmenu.text_size=but_text_size
+but_ynmenu.text_color=but_race_color
+but_noynmenu = PushButton(window_ynmenu, command=noaction, text="NO", width=ynbut_width, height=but_height, align="right")
+but_noynmenu.text_size=but_text_size
 
 #Keypad
 window_key = Window(app, title="Keypad")
@@ -1589,9 +1622,9 @@ window_system.text_size=but_text_size
 window_system.hide()
 but_system_00 = PushButton(window_system, command=menu_status_hard, text="HW", width=but_width, height=but_height, grid=[0,0])
 but_system_10 = PushButton(window_system, command=menu_status_soft, text="SW", width=but_width, height=but_height, grid=[1,0])
-but_system_20 = PushButton(window_system, command=window_num.show, text="NUM", width=but_width+1, height=but_height, grid=[2,0])
-but_system_01 = PushButton(window_system, lambda:ynmenu("quit",quitting), text="QUIT", width=but_width, height=but_height, grid=[0,1])
-but_system_11 = PushButton(window_system, lambda:ynmenu("reboot",reboot), text="REBOOT", width=but_width, height=but_height, grid=[1,1])
+but_system_20 = PushButton(window_system, command=ynmenu, args=["connect gps"], text="GPS", width=but_width+1, height=but_height, grid=[2,0])
+but_system_01 = PushButton(window_system, command=ynmenu, args=["quit"], text="QUIT", width=but_width, height=but_height, grid=[0,1])
+but_system_11 = PushButton(window_system, command=ynmenu, args=["reboot"], text="REBOOT", width=but_width, height=but_height, grid=[1,1])
 but_system_21 = PushButton(window_system, command=window_system.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
 
 # UTZ selection
@@ -1630,7 +1663,7 @@ but_timer_01 = PushButton(window_timer, command=window_racecountdown.show, text=
 but_timer_11 = PushButton(window_timer, lambda:single_show("stop"), text="Stop", width=but_width, height=but_height, grid=[1,1])
 but_timer_21 = PushButton(window_timer, command=window_timer.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
 
-# Meteorologics
+# Weather Station
 window_met = Window(app, title="Meterologics", layout="grid")
 window_met.tk.attributes("-fullscreen", True)
 window_met.text_size=but_text_size
@@ -1654,7 +1687,7 @@ window_settings.text_size=but_text_size
 window_settings.hide()
 but_settings_00 = PushButton(window_settings, command=window_display.show, text="DISP", width=but_width, height=but_height, grid=[0,0])
 but_settings_10 = PushButton(window_settings, command=window_avs.show, text="AVS", width=but_width, height=but_height, grid=[1,0])
-but_settings_20 = PushButton(window_settings, lambda:navigate("del"), text="WPT", width=but_width+1, height=but_height, grid=[2,0])
+but_settings_20 = PushButton(window_settings, lambda:wpt_nav("del"), text="WPT", width=but_width+1, height=but_height, grid=[2,0])
 but_settings_01 = PushButton(window_settings, command=window_utz.show, text="ZONE", width=but_width, height=but_height, grid=[0,1])
 but_settings_11 = PushButton(window_settings, text="UNIT", width=but_width, height=but_height, grid=[1,1])
 but_settings_21 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
@@ -1697,7 +1730,7 @@ window_nav = Window(app, title="Navigation", layout="grid")
 window_nav.tk.attributes("-fullscreen", True)
 window_nav.text_size=but_text_size
 window_nav.hide()
-but_nav_00 = PushButton(window_nav, lambda:navigate("nav"), text="WPT", width=but_width, height=but_height, grid=[0,0])
+but_nav_00 = PushButton(window_nav, lambda:wpt_nav("nav"), text="WPT", width=but_width, height=but_height, grid=[0,0])
 but_nav_10 = PushButton(window_nav, lambda:single_show("DTW"), text="DTW", width=but_width, height=but_height, grid=[1,0])
 but_nav_20 = PushButton(window_nav, lambda:single_show("navbear"), text="BRG", width=but_width+1, height=but_height, grid=[2,0])
 but_nav_01 = PushButton(window_nav, lambda:single_show("navttg"), text="TTG", width=but_width, height=but_height, grid=[0,1])
