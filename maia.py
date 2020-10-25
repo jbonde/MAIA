@@ -29,10 +29,10 @@ elif OSplatform=="Linux": # Assuming RPi as hardware
     except:
         print("mypi not installed")
 
-appver="1.5.0" # for displaying software version in the status window
-UDPmode=True # fetching sensor and GPS data via UDP if True
+appver="151" # for displaying software version in the status window
 SERmode=True # If GPS is connected to display and instrument data is fetched via UDP
-display_brightness=100 # BRIGHTNESS percentage %
+display_brightness=80 # Default brightness percentage  %
+displayRPi_brightness=200 # Default brightness for RPi 7" (0-255)
 
 # Clock
 counting=0 #Counter for stop watch
@@ -94,7 +94,6 @@ UTCOS=None # Time string formatted for OS time update when out of network
 GPSdate=190101 #Date received from GPS
 latdegminmin=None
 londegminmin=None
-GPSsim=False #GPS simulator mode
 
 #Seatalk 1 variables
 DEP=0 #Depth
@@ -110,6 +109,7 @@ STW=0 #log: speed through water
 #GPS data
 COG=0 #Course over ground
 SOG=0 #Speed over ground
+SOGmax=0 # Max speed at trip
 
 # UDP and MET commands
 UDPstring=None
@@ -122,17 +122,21 @@ UDP_PORT = 2000
 
 # Serial setup
 if SERmode==True:
-    import serial
-    # Serial communication with GPS and/or NMEA0183 input
-    port1 = "/dev/ttyUSB0"  # USB serial (Adafruit GPS etc)
-    port2 = "/dev/ttyUSB1"  # USB serial (Adafruit GPS etc)
-    port = "/dev/ttyACM0"  # RPi4 or RPi0 with BS-708 receiver at USB port
-    port4 = "/dev/ttyACM1"  # RPi with BS-708 receiver at USB port
-    port5 = "/dev/ttyAMA0"  # RPi Zero PIN 10
-    port6 = "/dev/ttyS0"    # RPi 3 + Zero PIN 10
-    portbaud=9600 # Baudrate: 9600 for GPS, 4800 for NMEA0183
-    porttimeout=1
-    ser = serial.Serial(port, baudrate = portbaud, timeout=porttimeout)
+    try:
+        import serial
+        # Serial communication with GPS and/or NMEA0183 input
+        port1 = "/dev/ttyUSB0"  # USB serial (Adafruit GPS etc)
+        port2 = "/dev/ttyUSB1"  # USB serial (Adafruit GPS etc)
+        port = "/dev/ttyACM0"  # RPi4 or RPi0 with BS-708 receiver at USB port
+        port4 = "/dev/ttyACM1"  # RPi with BS-708 receiver at USB port
+        port5 = "/dev/ttyAMA0"  # RPi Zero PIN 10
+        port6 = "/dev/ttyS0"    # RPi 3 + Zero PIN 10
+        portbaud=9600 # Baudrate: 9600 for GPS, 4800 for NMEA0183
+        porttimeout=1
+        ser = serial.Serial(port, baudrate = portbaud, timeout=porttimeout)
+    except:
+        SERmode=False
+        print("no serial connection")
 
 #metpng="smb://192.168.0.105/PiShare/met.png"
 
@@ -539,15 +543,10 @@ def timer_update():
 #        display_posneg("u")
     
 # *******************   DISPLAY CONTROL  *******************
-def display_on():
-    global display_brightness
-    display_brightness=70
-    #pwm.ChangeDutyCycle(display_brightness)
-    setsave()
 
 def display_adjust(bri):
     # function to adjust display brightness according to display type
-    global display_brightness,pwm
+    global display_brightness,displayRPi_brightness,pwm
 
     if bri=="on":
         display_brightness=70
@@ -563,33 +562,38 @@ def display_adjust(bri):
         if display_brightness<91:
             if display_brightness==1:
                 display_brightness=10
-            display_brightness=display_brightness+10
+            display_brightness+=10
+        #subprocess.run(['sudo','sh','-c','echo "128" > /sys/class/backlight/rpi_backlight/brightness'])
 
     if bri=="-":
         if display_brightness>9:
-            display_brightness=display_brightness-10
+            display_brightness-=10
             if display_brightness==0:
                 display_brightness=1        
+        #subprocess.run(['sudo','sh','-c','echo "50" > /sys/class/backlight/rpi_backlight/brightness'])
                 
     if bri=="100":    
         display_brightness=100
+        #subprocess.run(['sudo','sh','-c','echo "255" > /sys/class/backlight/rpi_backlight/brightness'])
 
     if screen_width==720:
-        print("assuming PiTFT 3.5'' display")
+        # print("assuming PiTFT 3.5'' display")
         pwm.ChangeDutyCycle(display_brightness)
 
     if screen_width==800:
-        print("assuming RPi 7'' display: 0<brightness<255")
-        RPibrightness=int(255*display_brightness/100)        
-        #subprocess.run(['sudo','sh','-c','echo "128" > /sys/class/backlight/rpi_backlight/brightness'])
-        subprocess.run(['sudo','sh','-c','echo ' + str(RPibrightness) + ' > /sys/class/backlight/rpi_backlight/brightness'])
-#        subprocess.run(['sudo','sh','-c','echo ', "128", ' > /sys/class/backlight/rpi_backlight/brightness'])
+        # print("assuming RPi 7'' display: 0<brightness<255")
+        displayRPi_brightness=int(255*display_brightness/100)        
+        subprocess.run(['sudo','sh','-c','echo ' + str(displayRPi_brightness) + ' > /sys/class/backlight/rpi_backlight/brightness'])
+#        subprocess.run(['sudo','sh','-c','echo',str(displayRPi_brightness),' > /sys/class/backlight/rpi_backlight/brightness'])
+        print(display_brightness)
+        print(displayRPi_brightness)
 
-    if screen_width==1920:
-        print("assuming HDMI display - no adjustment of brightness possible")
+    if screen_width>800:
+        print("assuming HDMI display - no brightness adjustment possible")
+        # Could possibly tweak colors instead
 
 #    else:
-#        print("assuming other display - no adjustment of brightness possible")
+#        print("Unknown display type - no brightness adjustment possible")
 
     setsave()
 
@@ -856,16 +860,16 @@ def dashboard_update():
 def GPSread():
     # read and split GPS data from serial port or UDP
     # format:  $GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68
-    global GPSUTC,GPSdate,GPSspeed,GPScourse,GPSNS,GPSEW,SOG,COG
+    global GPSUTC,GPSdate,GPSspeed,GPScourse,GPSNS,GPSEW,SOG,COG,SOGmax
     global ser,gpsdata,UTZ,UTZhours,TIMEZ,UTCOS,GPSNS,GPSEW,dayname,UDPupdate,daynumber
     global latnow,lonnow,latnowdms,lonnowdms,londegminmin,latdegminmin
-    if SERmode==True:  # Fetch GPS data from USB
+    if SERmode==True:  # Fetch GPS data from USB instead of UDP
         gpsdata = ser.readline().decode('ascii', errors='replace') #wait for each full line        
-    else:   # Fetch GPS data from UDP
+    else:   # Fetch GPS data from UDP instead of USB
         gpsdata=UDPstring
     if len(str(gpsdata))>8:
         header = gpsdata[3:6] # slicing out the header information (3 letters needed)
-        UDPupdate=UDPupdatedef #resetting the UDP timer to default value
+        UDPupdate=UDPupdatedef # resetting the UDP timer to default value
     else:
         header="1234567890"
     #print(header)
@@ -875,6 +879,8 @@ def GPSread():
         GPSdate=(RMCarray [9])
         GPSspeed=(float(RMCarray [7])) # knots
         SOG=GPSspeed
+        if SOG>SOGmax:
+            SOGmax=SOG
         if RMCarray [8]!="":
             GPScourse=(float(RMCarray [8]))
         else:
@@ -910,7 +916,7 @@ def GPSread():
 #            os.system('sudo hwclock --systohc') #Set hardware clock
 
 def UDPread():
-    global UDPstring,tempin,tempout,pressure,humidity,UDPaddress,TWSmax
+    global UDPstring,tempin,tempout,pressure,humidity,UDPaddress,TWSmax,SOGmax
     global DEP,TWS,TWD,TWA,TSE,STW,AWA,AWS #Seatalk1
 
     while True:
@@ -1207,7 +1213,7 @@ def AVSreset():
 def log_create():
     global logname
     #Creating new file after GPS time is received and inserting header
-    log_header = ["Date","UTC","UTZ", "SOG","COG","tripdistance","triptime(min)","latdep","londep","Latitude","Longitude","latdes","londes","destination","tempin","tempout","humidity","HPa","AWA","AWS","TWD","TWS","BRG","DTW","Depth","SEA"]
+    log_header = ["Date","UTC","UTZ", "SOG","SOGmax","COG","tripdistance","triptime(min)","latdep","londep","Latitude","Longitude","latdes","londes","destination","tempin","tempout","humidity","HPa","AWA","AWS","TWD","TWS","TWSmax","BRG","DTW","Depth","SEA"]
     if OSplatform=="Linux":
         logname='/home/pi/' + str(GPSdate) + "-" + str(UTZ) + '.csv'
     else:
@@ -1219,15 +1225,8 @@ def log_create():
 def log_update(): # save data to logfile
     global tempin,tempout,pressure,humidity
     logtripdis= '{:4.1f}'.format(tripdistance)
-    if UDPmode==False:
-        tempin = '{:4.1f}'.format(measurebmp.get_temperature())
-        pressure = '{:4.0f}'.format(measurebmp.get_pressure())
-        if DHT22import==True:
-            humidity, tempout = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
-        humidity= '{:4.1f}'.format(humidity)
-        tempout= '{:4.1f}'.format(tempout)
     logtriptime= triptime/60
-    log_data = [GPSdate,GPSUTC,UTZ, GPSspeed,GPScourse,logtripdis,logtriptime,latdep,londep,latnow,lonnow,latdes,londes,dest,tempin,tempout,humidity,pressure,AWA,AWS,TWD,TWS,BRG,DTW,DEP,TSE]
+    log_data = [GPSdate,GPSUTC,UTZ, GPSspeed,SOGmax,GPScourse,logtripdis,logtriptime,latdep,londep,latnow,lonnow,latdes,londes,dest,tempin,tempout,humidity,pressure,AWA,AWS,TWD,TWS,TWSmax,BRG,DTW,DEP,TSE]
     with open(logname,"a") as f:
         f.write(",".join(str(value) for value in log_data)+ "\n")
 
@@ -1376,6 +1375,7 @@ def menu_status_soft():
     status_list_column.append("AVS30 " + str(AVS30))
     status_list_column.append("AVS60 " + str(AVS60))
     status_list_column.append("AVSlog " + str(AVSlog))
+    status_list_column.append("SOGmax " + str(SOGmax))
 
     window_status.text_size=but_text_size-16
     window_status.show()
@@ -1622,7 +1622,7 @@ window_system.text_size=but_text_size
 window_system.hide()
 but_system_00 = PushButton(window_system, command=menu_status_hard, text="HW", width=but_width, height=but_height, grid=[0,0])
 but_system_10 = PushButton(window_system, command=menu_status_soft, text="SW", width=but_width, height=but_height, grid=[1,0])
-but_system_20 = PushButton(window_system, command=ynmenu, args=["connect gps"], text="GPS", width=but_width+1, height=but_height, grid=[2,0])
+but_system_20 = PushButton(window_system, text=" ", width=but_width+1, height=but_height, grid=[2,0])
 but_system_01 = PushButton(window_system, command=ynmenu, args=["quit"], text="QUIT", width=but_width, height=but_height, grid=[0,1])
 but_system_11 = PushButton(window_system, command=ynmenu, args=["reboot"], text="REBOOT", width=but_width, height=but_height, grid=[1,1])
 but_system_21 = PushButton(window_system, command=window_system.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
@@ -1680,17 +1680,31 @@ window_met_graph.tk.attributes("-fullscreen", True)
 window_met_graph.hide()
 but_met=PushButton(window_met_graph, command=window_met_graph.hide, image=metpng)
 '''
-# Menu for settings 
+# 4x3 Menu for settings
 window_settings = Window(app, title="settings", layout="grid")
 window_settings.tk.attributes("-fullscreen", True)
 window_settings.text_size=but_text_size
 window_settings.hide()
-but_settings_00 = PushButton(window_settings, command=window_display.show, text="DISP", width=but_width, height=but_height, grid=[0,0])
-but_settings_10 = PushButton(window_settings, command=window_avs.show, text="AVS", width=but_width, height=but_height, grid=[1,0])
-but_settings_20 = PushButton(window_settings, lambda:wpt_nav("del"), text="WPT", width=but_width+1, height=but_height, grid=[2,0])
-but_settings_01 = PushButton(window_settings, command=window_utz.show, text="ZONE", width=but_width, height=but_height, grid=[0,1])
-but_settings_11 = PushButton(window_settings, text="UNIT", width=but_width, height=but_height, grid=[1,1])
-but_settings_21 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+
+if screen_width>800:
+    but_set_width=int(screen_width/150)
+    but_set_heigth=int(screen_height/200)
+else:
+    but_set_width=int(screen_width/130)
+    but_set_heigth=int(screen_height/170)
+
+but_settings_00 = PushButton(window_settings, command=window_display.show, text="DIS", width=but_set_width, height=but_set_heigth, grid=[0,0])
+but_settings_10 = PushButton(window_settings, command=window_avs.show, text="AVS", width=but_set_width, height=but_set_heigth, grid=[1,0])
+but_settings_20 = PushButton(window_settings, lambda:wpt_nav("del"), text="WPT", width=but_set_width, height=but_set_heigth, grid=[2,0])
+but_settings_30 = PushButton(window_settings, command=ynmenu, args=["connect gps"], text="GPS", width=but_set_width, height=but_set_heigth, grid=[3,0])
+but_settings_01 = PushButton(window_settings, command=window_utz.show, text="ZONE", width=but_set_width, height=but_set_heigth, grid=[0,1])
+but_settings_11 = PushButton(window_settings, text="UNIT", width=but_set_width, height=but_set_heigth, grid=[1,1])
+but_settings_21 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_set_width, height=but_set_heigth, grid=[2,1])
+but_settings_31 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_set_width, height=but_set_heigth, grid=[3,1])
+but_settings_02 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_set_width, height=but_set_heigth, grid=[0,2])
+but_settings_12 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_set_width, height=but_set_heigth, grid=[1,2])
+but_settings_22 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_set_width, height=but_set_heigth, grid=[2,2])
+but_settings_32 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_set_width, height=but_set_heigth, grid=[3,2])
 
 # Menu for selecting service features
 window_service = Window(app, title="Service", layout="grid")
@@ -1791,11 +1805,12 @@ but_main_01.text_size=but_text_size
 but_main_11.text_size=but_text_size
 but_main_21.text_size=but_text_size
 
-if UDPmode==True:
-    U = threading.Thread(target=UDPread)
-    U.start()
+U = threading.Thread(target=UDPread)
+U.start()
+
 display_update()
 setload()
+display_adjust("on")
 app.repeat(1000, timer_update)  # Schedule call to update timer every 1 sec
 #if serimport==True:
 app.repeat(1000, GPSread) #read data from GPS 1/1 sec
