@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # Maritime application for use with touch displays
+appver="174" # for displaying software version in the status window
 # Installation and configuration guide at https://github.com/jbonde/MAIA/blob/master/installation
 
 from guizero import App, Text, PushButton, Window, ListBox, Box, Picture, Drawing
@@ -29,8 +30,7 @@ elif OSplatform=="Linux": # Assuming RPi as hardware
     except:
         print("mypi not installed")
 
-appver="151" # for displaying software version in the status window
-SERmode=True # If GPS is connected to display and instrument data is fetched via UDP
+GPSUSB=True # If GPS is connected to display USB port and instrument data is fetched via UDP
 display_brightness=80 # Default brightness percentage  %
 displayRPi_brightness=200 # Default brightness for RPi 7" (0-255)
 
@@ -67,6 +67,7 @@ colorback=None #"white"
 #Met variables
 tempin=None
 tempout=None
+temp18B20=None
 pressure=None
 altitude=None
 seapressure=None
@@ -120,23 +121,10 @@ metpng="met.png"
 UDP_IP = ""
 UDP_PORT = 2000
 
-# Serial setup
-if SERmode==True:
-    try:
-        import serial
-        # Serial communication with GPS and/or NMEA0183 input
-        port1 = "/dev/ttyUSB0"  # USB serial (Adafruit GPS etc)
-        port2 = "/dev/ttyUSB1"  # USB serial (Adafruit GPS etc)
-        port = "/dev/ttyACM0"  # RPi4 or RPi0 with BS-708 receiver at USB port
-        port4 = "/dev/ttyACM1"  # RPi with BS-708 receiver at USB port
-        port5 = "/dev/ttyAMA0"  # RPi Zero PIN 10
-        port6 = "/dev/ttyS0"    # RPi 3 + Zero PIN 10
-        portbaud=9600 # Baudrate: 9600 for GPS, 4800 for NMEA0183
-        porttimeout=1
-        ser = serial.Serial(port, baudrate = portbaud, timeout=porttimeout)
-    except:
-        SERmode=False
-        print("no serial connection")
+# Serial variable
+port=None
+ser=None
+
 
 #metpng="smb://192.168.0.105/PiShare/met.png"
 
@@ -201,7 +189,7 @@ def ynmenu(ynaction):
     window_ynmenu.show()
 
 def yesaction(): # Action to be performed if YES button is clicked
-    global SERmode
+    global GPSUSB
     if mode=="quit":
         quitting()
     if mode=="reboot":
@@ -218,11 +206,13 @@ def noaction(): # Action to be performed if NO button is clicked
         window_ynmenu.hide()
 
 def SERgps(answer):
-    global SERmode
+    global GPSUSB
     if answer=="yes":
-        SERmode=True
+        GPSUSB=True
+        serinit()
     else:
-        SERmode=False
+        GPSUSB=False
+        setsave()
     window_ynmenu.hide()
 
 # Show single data  
@@ -444,6 +434,8 @@ def timer_update():
         #    humidity, tempout = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
         #    humidity = '{:2.0f}'.format(humidity)
         but_single.text=str(humidity) + " %"     
+    if mode=="t18B20":
+        but_single.text=str(temp18B20) # + " °C"    
     if mode=="dash":
         dashboard_update()
     if mode=="gpsall":
@@ -585,8 +577,8 @@ def display_adjust(bri):
         displayRPi_brightness=int(255*display_brightness/100)        
         subprocess.run(['sudo','sh','-c','echo ' + str(displayRPi_brightness) + ' > /sys/class/backlight/rpi_backlight/brightness'])
 #        subprocess.run(['sudo','sh','-c','echo',str(displayRPi_brightness),' > /sys/class/backlight/rpi_backlight/brightness'])
-        print(display_brightness)
-        print(displayRPi_brightness)
+        print("display_brightness " + str(display_brightness))
+        print("displayRPi_brightness " + str(displayRPi_brightness))
 
     if screen_width>800:
         print("assuming HDMI display - no brightness adjustment possible")
@@ -651,8 +643,8 @@ def display_posneg(n):
     else:
         colorfor="white"
         colorback="black"
-    if n=="p": # if posneg is changed from panel
-        display_update()
+    #if n=="p": # if posneg is changed from panel
+    display_update()
 #    if n=="u": # function called from UDP check when signal is present (UDPupdate > 0)
 #        display_update()
     setsave()
@@ -856,14 +848,36 @@ def dashboard_update():
     #metpng = curl -O 192.168.0.105/met.png
 
 # *****************   Navigation   ****************************
-        
+
+def serinit():
+    # Serial setup
+    global port, ser, GPSUSB
+    if GPSUSB==True:
+        try:
+            import serial
+            # Serial communication with GPS and/or NMEA0183 input
+            port1 = "/dev/ttyUSB0"  # USB serial (Adafruit GPS etc)
+            port2 = "/dev/ttyUSB1"  # USB serial (Adafruit GPS etc)
+            port = "/dev/ttyACM0"  # RPi4 or RPi0 with BS-708 receiver at USB port
+            port4 = "/dev/ttyACM1"  # RPi with BS-708 receiver at USB port
+            port5 = "/dev/ttyAMA0"  # RPi Zero PIN 10
+            port6 = "/dev/ttyS0"    # RPi 3 + Zero PIN 10
+            portbaud=9600 # Baudrate: 9600 for GPS, 4800 for NMEA0183
+            porttimeout=1
+            ser = serial.Serial(port, baudrate = portbaud, timeout=porttimeout)
+            print("ser= " + str(ser))
+        except:
+            GPSUSB=False
+            print("no serial connection. GPSUSB=" + str(GPSUSB))
+    setsave()
+
 def GPSread():
     # read and split GPS data from serial port or UDP
     # format:  $GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68
     global GPSUTC,GPSdate,GPSspeed,GPScourse,GPSNS,GPSEW,SOG,COG,SOGmax
     global ser,gpsdata,UTZ,UTZhours,TIMEZ,UTCOS,GPSNS,GPSEW,dayname,UDPupdate,daynumber
     global latnow,lonnow,latnowdms,lonnowdms,londegminmin,latdegminmin
-    if SERmode==True:  # Fetch GPS data from USB instead of UDP
+    if GPSUSB==True:  # Fetch GPS data from USB instead of UDP
         gpsdata = ser.readline().decode('ascii', errors='replace') #wait for each full line        
     else:   # Fetch GPS data from UDP instead of USB
         gpsdata=UDPstring
@@ -916,7 +930,7 @@ def GPSread():
 #            os.system('sudo hwclock --systohc') #Set hardware clock
 
 def UDPread():
-    global UDPstring,tempin,tempout,pressure,humidity,UDPaddress,TWSmax,SOGmax
+    global UDPstring,tempin,tempout,temp18B20,pressure,humidity,UDPaddress,TWSmax,SOGmax
     global DEP,TWS,TWD,TWA,TSE,STW,AWA,AWS #Seatalk1
 
     while True:
@@ -937,6 +951,7 @@ def UDPread():
             tempout=(WEAarray [2])
             pressure=(WEAarray [3])
             humidity=(WEAarray [4])
+            temp18B20=(WEAarray [5])
         if header=="DBT":
             DBTarray=UDPstring.split(",") #DBT - Depth Below Transducer
             DEP='{:3.1f}'.format(float(DBTarray[3]))
@@ -1223,7 +1238,7 @@ def log_create():
 #    print ("New log created: " + str(logname))
 
 def log_update(): # save data to logfile
-    global tempin,tempout,pressure,humidity
+    #global tempin,tempout,pressure,humidity
     logtripdis= '{:4.1f}'.format(tripdistance)
     logtriptime= triptime/60
     log_data = [GPSdate,GPSUTC,UTZ, GPSspeed,SOGmax,GPScourse,logtripdis,logtriptime,latdep,londep,latnow,lonnow,latdes,londes,dest,tempin,tempout,humidity,pressure,AWA,AWS,TWD,TWS,TWSmax,BRG,DTW,DEP,TSE]
@@ -1231,32 +1246,46 @@ def log_update(): # save data to logfile
         f.write(",".join(str(value) for value in log_data)+ "\n")
 
 def setsave():
+    # Saving current settings
     with open("maia.csv","w") as m:
-        m.write("TIMEZ" + "=" + str(TIMEZ)) 
-        m.write("display_brightness" + "=" + str(display_brightness)) 
-        m.write("posmode" + "=" + str(posmode)) 
-
+        m.write("TIMEZ" + "=" + str(TIMEZ) + '\n') 
+        m.write("display_brightness" + "=" + str(display_brightness) + '\n') 
+        m.write("posmode" + "=" + str(posmode) + '\n') 
+        m.write("GPSUSB" + "=" + str(GPSUSB) + '\n') 
+        m.write("triplog" + "=" + str(triplog) + '\n')       
+        if GPSUSB==True:
+            but_settings_30.text_color="green"
+        else:
+            but_settings_30.text_color="red"
+            
 def setload():
-    global TIMEZ,display_brightness,posmode
+    global TIMEZ,display_brightness,posmode,GPSUSB,triplog
     try:        
         with open('maia.csv', encoding="latin-1", newline='') as csvfile: # Open CSV file with settings
             settingsfile = list(csv.reader(csvfile, delimiter='=')) # Create list from csv file
-#            maiasettings=[]
-#            for m in maiasettings[0]:
-#                maiasettings.append(str(settingsfile[0][i]))
+        print("settingsfile: " + str(settingsfile))
         TIMEZ=int(settingsfile[0][1])
-        UTZ_set(0)
         print("TIMEZ loaded: " + str(TIMEZ))
-        display_brightness=int(settingsfile[0][2])
+        display_brightness=int(settingsfile[1][1])
         #pwm.ChangeDutyCycle(display_brightness)
         print("display_brightness loaded: " + str(display_brightness))
-        posmodestr=str(settingsfile[0][2])
+        posmodestr=str(settingsfile[2][1])
         if posmodestr=="True":
             posmode=True
         else:
             posmode=False
-        display_posneg("z")
         print("posmode loaded: " + str(posmode))
+        GPSUSBstr=str(settingsfile[3][1])
+        if GPSUSBstr=="True":
+            GPSUSB=True
+            serinit()
+        else:
+            GPSUSB=False
+        print("GPSUSB mode loaded: " + str(GPSUSB))
+
+        UTZ_set(0)
+        display_adjust("z")
+        display_posneg("z")
 
     except:
         print("no settings file ")
@@ -1367,6 +1396,7 @@ def menu_status_soft():
     status_list_column.append("ser port " + str(port))
     status_list_column.append("UDPport " + str(UDP_PORT))
     status_list_column.append("gpioimport " + str(gpioimport))
+    status_list_column.append("GPS USB " + str(GPSUSB))
 #    status_list_column.append("BMP280 " + str(BMP280import))
     status_list_column.append("TTG " + str(TTG))
     status_list_column.append("TWSmax " + str(TWSmax)[0:4])
@@ -1380,7 +1410,7 @@ def menu_status_soft():
     window_status.text_size=but_text_size-16
     window_status.show()
 
-display_posneg("z")
+#display_posneg("z")
 
 app = App(title="Marine control panel", layout="grid")#, width=480, height=320)
 app.tk.attributes("-fullscreen", True)
@@ -1670,7 +1700,7 @@ window_met.text_size=but_text_size
 window_met.hide()
 but_met_00 = PushButton(window_met, lambda:single_show("tIN"), text="tIN", width=but_width, height=but_height, grid=[0,0])
 but_met_10 = PushButton(window_met, lambda:single_show("tOUT"), text="tOUT", width=but_width, height=but_height, grid=[1,0])
-but_met_20 = PushButton(window_met, text=" ", width=but_width+1, height=but_height, grid=[2,0])
+but_met_20 = PushButton(window_met, lambda:single_show("t18B20"), text="t18B20", width=but_width+1, height=but_height, grid=[2,0]) 
 but_met_01 = PushButton(window_met, lambda:single_show("hPa"), text="hPa", width=but_width, height=but_height, grid=[0,1])
 but_met_11 = PushButton(window_met, lambda:single_show("HUM"), text="HUM", width=but_width, height=but_height, grid=[1,1])
 but_met_21 = PushButton(window_met, command=window_met.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
@@ -1810,7 +1840,8 @@ U.start()
 
 display_update()
 setload()
-display_adjust("on")
+serinit()
+#display_adjust("z")
 app.repeat(1000, timer_update)  # Schedule call to update timer every 1 sec
 #if serimport==True:
 app.repeat(1000, GPSread) #read data from GPS 1/1 sec
@@ -1819,6 +1850,5 @@ app.repeat(1000, GPSread) #read data from GPS 1/1 sec
 app.display()
 
 # Installation and configuration notes at https://github.com/jbonde/MAIA/blob/master/installation
-
 
 #EOF
