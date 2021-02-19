@@ -27,7 +27,7 @@ MOB. A "Man Over Board" button is placed centrally in the Main menu in order to 
 
 The * (sub menu)  section gives access to the Timer- and Race modules and Weather data from the temperature, air pressure and humidity sensors as well as system information. Settings can also be reached from this section eg if you would like a layout with black background or dim the display during night passages.
 
-For further insight to the general flow and sub-menus please check MAIA_functionality.png and the MAIA.png flowchart 
+For further insight to the general flow and sub-menus please check MAIA_functionality.pdf and the MAIA.pdf flowcharts
 
 ## Data acquisition
 Instrument data are acquired and submitted from the MAIA server (see MAIAserver.py) or any other device capable of broadcasting standard NMEA-sentences via UDP. For full data feed the MAIAserver with weather sensors is required and for this a non-standard NMEA header "WEA" is used for transmitting data from sensors (temperature, humidity and pressure). The data can picked up by clients from a standard LAN of your choice in order to service as many display configurations as desired on board.
