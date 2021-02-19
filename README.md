@@ -37,3 +37,4 @@ The MAIA application can be tested by running MAIAsimulator.py on a separate RPi
 
 ## Disclaimer
 MAIA should never be used as the primary navigation tool as it is a supplement to proven marine products on the market. Some features still need to be tested in live environments so use of the system is by own responsibility and developers have no liabilities for any errors and problems related to the MAIA system.
+Some features have not yet been tested like the server board and analogue inputs used for battery monitoring etc. 
