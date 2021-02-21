@@ -78,9 +78,10 @@ https://learn.sparkfun.com/tutorials/how-to-run-a-raspberry-pi-program-on-startu
 ********************************
 
 ## Server
-The server is based on a standard RPi (Zero is fine) and some components for interfacing with peripherals. Check the PNG schematic for explanation
-MAIAserver.py
+The server is based on a standard RPi (Zero is fine) and some components for interfacing with peripherals. Check the PDF schematic for explanation
+
+Code: MAIAserver.py
 
 ## Simulator
 
-MAIAsimulator.py
+Code: MAIAsimulator.py
