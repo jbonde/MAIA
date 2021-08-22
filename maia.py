@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # Maritime application for use with touch displays
-appver="174" # for displaying software version in the status window
+appver="179" # for displaying software version in the status window
 # Installation and configuration guide at https://github.com/jbonde/MAIA/blob/master/installation
 
 from guizero import App, Text, PushButton, Window, ListBox, Box, Picture, Drawing
@@ -16,15 +16,17 @@ import threading
 import socket
 import platform
 
+gpioimport=False
 OSplatform=(platform.system())
 print("OSplatform = " + str(OSplatform))
-gpioimport=False
+
 if OSplatform=="Windows":
     workdir="C:\\"
 elif OSplatform=="Linux": # Assuming RPi as hardware
     import RPi.GPIO as GPIO # used for dimming PiTFT display and controlling buzzer if installed with current display
     GPIO.setmode(GPIO.BCM)
     gpioimport=True
+    print("gpioimport=True")
     try:
         import mypi #script to check hardware
     except:
@@ -64,6 +66,11 @@ posmode=True # black text n white back. Opposite if False
 colorfor=None #"black"
 colorback=None #"white"
 
+#Voltages
+VOL1=None
+VOL2=None
+VOL3=None
+
 #Met variables
 tempin=None
 tempout=None
@@ -92,9 +99,12 @@ GPSNS=None #N or S
 GPSEW=None #E or W
 GPSUTC=None #Time in UTC format
 UTCOS=None # Time string formatted for OS time update when out of network
-GPSdate=190101 #Date received from GPS
+GPSdate=210101 #Date received from GPS
 latdegminmin=None
 londegminmin=None
+COG=0 #Course over ground
+SOG=0 #Speed over ground
+SOGmax=0 # Max speed at trip
 
 #Seatalk 1 variables
 DEP=0 #Depth
@@ -106,11 +116,6 @@ AWS=0 #Apparent wind speed
 AWA=0 #Apparent wind angle
 TSE=0 #Sea temperature
 STW=0 #log: speed through water
-
-#GPS data
-COG=0 #Course over ground
-SOG=0 #Speed over ground
-SOGmax=0 # Max speed at trip
 
 # UDP and MET commands
 UDPstring=None
@@ -124,7 +129,6 @@ UDP_PORT = 2000
 # Serial variable
 port=None
 ser=None
-
 
 #metpng="smb://192.168.0.105/PiShare/met.png"
 
@@ -482,7 +486,8 @@ def timer_update():
         but_single.text=UTZ[0:2]+":"+UTZ[2:4] #UTZ hours and minutes separated by :
     if mode=="date":
         but_single.text_size=but_text_medsize+40
-        but_single.text=str(dayname)+ "\n" + str(GPSdate)
+        but_single.text=str(GPSdate)
+#        but_single.text=str(dayname)+ "\n" + str(GPSdate)
     if mode=="DTW":
         but_single.text=str(DTW)[0:5] # Chopping off some small digits
     if mode=="navbear":
@@ -651,7 +656,7 @@ def display_posneg(n):
 
 def PiTFT():
 # Initializing PiTFT display brightness
-    global pwm
+    global pwm,gpioimport
     if gpioimport==True:
         try:
             #Setting STMPE control 'not active' as the STMPE GPIO overrides the PWM output on PIN 18.
@@ -826,7 +831,8 @@ def dashboard_update():
         drawing_angle_offset=drawing_angle_offset+90 # Change angle for next compass corner
 
     # Paint colored lines for all known directions
-    drawing_angles=[BRG,COG,(COG+AWA),TWD]
+#    drawing_angles=[BRG,COG,(COG+AWA),TWD] #used for north up????
+    drawing_angles=[BRG,COG,AWA,TWD]
     drawing_angle_colors=[BRG_color, COG_color, AWA_color, TWD_color]
     for a in range(len(drawing_angles)):
         angle_rad=math.radians(90+drawing_angle_offset-float(drawing_angles[a])) # convert angle deg to radians
@@ -932,6 +938,7 @@ def GPSread():
 def UDPread():
     global UDPstring,tempin,tempout,temp18B20,pressure,humidity,UDPaddress,TWSmax,SOGmax
     global DEP,TWS,TWD,TWA,TSE,STW,AWA,AWS #Seatalk1
+    global VOL1,VOL2,VOL3
 
     while True:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
@@ -957,6 +964,12 @@ def UDPread():
             DEP='{:3.1f}'.format(float(DBTarray[3]))
 #        if header=="MWV":
 #           MWVarray=UDPstring.split(",") #make array according to comma-separation in string
+        if header=="VOL":
+            VOLarray=UDPstring.split(",") #VOL - Voltage inputs
+            VOL1='{:3.1f}'.format(float(VOLarray[1]))
+            VOL2='{:3.1f}'.format(float(VOLarray[2]))
+            VOL3='{:3.1f}'.format(float(VOLarray[3]))
+
         if header=="VWR":
             VWRarray=UDPstring.split(",") #VWR - Relative Wind Speed and Angle
             AWA=float(VWRarray[1]) # Wind angle to bow magnitude in degrees
@@ -1317,8 +1330,12 @@ def menu_status_hard():
     status_list_column.append("" + str(datetime.now())[11:19])
     status_list_column.append("res " + str(screen_width) + "x" + str(screen_height))
     if OSplatform=="Linux": 
-        status_list_column.append(mypi.getModel()[:15])
-        status_list_column.append(mypi.getModel()[15:])
+        try:
+
+            status_list_column.append(mypi.getModel()[:15])
+            status_list_column.append(mypi.getModel()[15:])
+        except:
+            status_list_column.append("model failed")            
         status_list_column.append(mypi.platform.platform()[:15])
         status_list_column.append(mypi.platform.platform()[15:30])
         status_list_column.append(mypi.platform.platform()[30:])
@@ -1406,6 +1423,7 @@ def menu_status_soft():
     status_list_column.append("AVS60 " + str(AVS60))
     status_list_column.append("AVSlog " + str(AVSlog))
     status_list_column.append("SOGmax " + str(SOGmax))
+    status_list_column.append(str(VOL1) + " " + str(VOL2) + " " + str(VOL3))
 
     window_status.text_size=but_text_size-16
     window_status.show()
