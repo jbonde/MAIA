@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # Maritime application for use with touch displays
-appver="179" # for displaying software version in the status window
+appver="191" # for displaying software version in the status window
 # Installation and configuration guide at https://github.com/jbonde/MAIA/blob/master/installation
 
 from guizero import App, Text, PushButton, Window, ListBox, Box, Picture, Drawing
@@ -67,18 +67,18 @@ colorfor=None #"black"
 colorback=None #"white"
 
 #Voltages
-VOL1=None
-VOL2=None
-VOL3=None
+VOL1=0
+VOL2=0
+VOL3=0
 
 #Met variables
-tempin=None
-tempout=None
-temp18B20=None
-pressure=None
-altitude=None
-seapressure=None
-humidity=None
+tempin=0
+tempout=0
+temp18B20=0
+pressure=0
+altitude=0
+seapressure=0
+humidity=0
 
 #GPS variables
 latdep=None #Position of departure
@@ -93,8 +93,6 @@ latdesdms=None
 londesdms=None
 latbef=None #Last destination measured (for calculating trip distance)
 lonbef=None
-GPSspeed=0
-GPScourse=0
 GPSNS=None #N or S
 GPSEW=None #E or W
 GPSUTC=None #Time in UTC format
@@ -114,7 +112,7 @@ TWD=0 #True wind direction
 TWA=0 #True wind angle to COG
 AWS=0 #Apparent wind speed
 AWA=0 #Apparent wind angle
-TSE=0 #Sea temperature
+TSE=None #Sea temperature
 STW=0 #log: speed through water
 
 # UDP and MET commands
@@ -137,7 +135,7 @@ dest="" # Name of destination
 DTW=0 # Distance from current position to selected waypoint
 BRG=0 # Bearing to destination
 TIMEZ = 2 #Offsetting GPS UTC time to local timezone 1=winther EST; 2=summer EST
-UTZ=str(0)# Local time UTC+TIMEZ
+UTZ="timenow"# Local time UTC+TIMEZ
 TTG=0 # Time-to-go
 ETA=0 # Expected time of arrival
 navlog=[] #log list used for AVS summarizing distance covered each minute
@@ -364,7 +362,7 @@ def raceup():
     
 def timer_update():
     global counting,racecountdown,homise
-    global GPSUTC,GPSdate,GPSspeed,GPScourse,GPSNS,GPSEW,latnow,lonnow,latnowdms,lonnowdms,TTG,ETA,UTZ,UTCOS
+    global GPSUTC,GPSdate,SOG,COG,GPSNS,GPSEW,latnow,lonnow,latnowdms,lonnowdms,TTG,ETA,UTZ,UTCOS
     global mode, but_text_bigsize, but_text_medsize
     global tempin, tempout, pressure, altitude, seapressure,humidity
     global racecount,but_race_color,but_race_text,but_race,but_raceup,but_racedown,downcount
@@ -396,7 +394,7 @@ def timer_update():
         if latdes != None:
             DTW=WPTdistance(latnow,lonnow,latdes,londes) #calculate distance to waypoint in nm if GPS is live and a destination is selected
             DTW=str(DTW)[0:4]
-            TTGsec=int((float(DTW))*3600/GPSspeed)# Find Time-to-go in seconds. Replace GPSspeed with AVS
+            TTGsec=int((float(DTW))*3600/SOG)# Find Time-to-go in seconds. Replace SOG with AVS
             TTG=str(timedelta(0,TTGsec))
             BRG=float(WPTbearing(latnow,lonnow,latdes,londes)) #calculate bearing to waypoint
             timenow=datetime.now()
@@ -416,6 +414,18 @@ def timer_update():
                 lonint=lonnow
                 log_update() # append current log data to log file
                 tripcount=0
+    if mode=="ALLDATA":
+        but_single.text_size=int(but_text_medsize/3.0)
+        SOGstring='{:3.1f}'.format(float(SOG)) #str(SOG)
+        but_single.text = \
+            "Date " + str(GPSdate) + " " + "UTC " + GPSUTC[0:2] + ":" + GPSUTC[2:4] + "\n" \
+            + str(latnowdms) + str(GPSNS) + " " + str(lonnowdms) + str(GPSEW) + "\n" \
+            + "SOG " + str(SOGstring) + " "  + "COG " + str(COG) + "\n" \
+            + "tIn " + str(tempin) + " tOut " + str(tempout)+ " 18B20 " +  '{:3.1f}'.format(float(temp18B20)) + "\n" \
+            + "hPa " + str(pressure) + " hum " + str(humidity) + " %"  + "\n" \
+            + "AWS " + '{:3.1f}'.format(AWS) + " AWA " + str(int(AWA)).zfill(3) + " TWS " + '{:3.1f}'.format(TWS) + " TWD " + str(int(TWD)).zfill(3) + "\n" \
+            + "DEPTH " + '{:3.1f}'.format(float(DEP)) + " STW " + '{:3.1f}'.format(float(STW)) + "\n" \
+            + "VOL1 "+ str(VOL1) + " " + "VOL2 "+ str(VOL2) + " " + "VOL3 " + str(VOL3) 
     if mode=="tIN":
         #if BMP280import==True:
         #    tempin = '{:4.1f}'.format(measurebmp.get_temperature())
@@ -444,17 +454,19 @@ def timer_update():
         dashboard_update()
     if mode=="gpsall":
         but_single.text_size=but_text_medsize-20
-        but_single.text=str(latnowdms)+ str(GPSNS) + "\n" + str(lonnowdms) + str(GPSEW)  + "\n" + "Speed " + str(GPSspeed) + "\n" + "Course " + str(GPScourse)
+        SOGstring='{:3.1f}'.format(float(SOG)) #str(SOG)
+        but_single.text=str(latnowdms)+ str(GPSNS) + "\n" + str(lonnowdms) + str(GPSEW)  + "\n" + "Speed " + str(SOGstring) + "\n" + "Course " + str(COG)
     if mode=="gpspos":
         but_single.text_size=but_text_medsize
         but_single.text=str(latnowdms) + str(GPSNS) + "\n" + str(lonnowdms) + str(GPSEW) 
-    if mode=="gpsspeed": # current speed in nm as fetched from GPS
-        but_single.text=str(GPSspeed)
+    if mode=="SOG": # current speed in nm as fetched from GPS
+        SOGstring='{:3.1f}'.format(float(SOG)) #str(SOG)
+        but_single.text=SOGstring
     if mode=="gpshead":
-        if str(GPScourse)[2:3]==".":
-            but_single.text=str(GPScourse)[0:2]
+        if str(COG)[2:3]==".":
+            but_single.text=str(COG)[0:2]
         else:
-            but_single.text=str(GPScourse)[0:3]
+            but_single.text=str(COG)[0:3]
     if mode=="DEP": # current depth
         but_single.text='{:3.1f}'.format(float(DEP)) #str(DEP)
     if mode=="TWS": # true wind speed
@@ -691,7 +703,8 @@ def dashboard_update():
     # Function called from the timer to update values in the dashboard window once per second
 
     BRG_color="cyan"
-    COG_color="blue"
+#    COG_color="blue"
+    COG_color=(153,80,240)
     TWD_color="orange"
     if AWA>=0:
         AWA_color="green"
@@ -832,7 +845,10 @@ def dashboard_update():
 
     # Paint colored lines for all known directions
 #    drawing_angles=[BRG,COG,(COG+AWA),TWD] #used for north up????
-    drawing_angles=[BRG,COG,AWA,TWD]
+    AWD=COG+AWA #Apparant compass direction
+    if AWD>=360:
+        AWD=AWD-360
+    drawing_angles=[BRG,COG,AWD,TWD]
     drawing_angle_colors=[BRG_color, COG_color, AWA_color, TWD_color]
     for a in range(len(drawing_angles)):
         angle_rad=math.radians(90+drawing_angle_offset-float(drawing_angles[a])) # convert angle deg to radians
@@ -880,7 +896,7 @@ def serinit():
 def GPSread():
     # read and split GPS data from serial port or UDP
     # format:  $GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68
-    global GPSUTC,GPSdate,GPSspeed,GPScourse,GPSNS,GPSEW,SOG,COG,SOGmax
+    global GPSUTC,GPSdate,COG,GPSNS,GPSEW,SOG,SOGmax
     global ser,gpsdata,UTZ,UTZhours,TIMEZ,UTCOS,GPSNS,GPSEW,dayname,UDPupdate,daynumber
     global latnow,lonnow,latnowdms,lonnowdms,londegminmin,latdegminmin
     if GPSUSB==True:  # Fetch GPS data from USB instead of UDP
@@ -897,15 +913,17 @@ def GPSread():
         RMCarray=gpsdata.split(",") #make array according to comma-separation in string
         GPSUTC=(RMCarray [1])
         GPSdate=(RMCarray [9])
-        GPSspeed=(float(RMCarray [7])) # knots
-        SOG=GPSspeed
+        try:
+            SOG=(float(RMCarray [7])) # knots
+        except:
+            SOG=0
+#        SOG='{:3.1f}'.format(float(RMCarray [7])) #str(SOG)
         if SOG>SOGmax:
             SOGmax=SOG
         if RMCarray [8]!="":
-            GPScourse=(float(RMCarray [8]))
+            COG=(float(RMCarray [8]))
         else:
-            GPScourse=0
-        COG=GPScourse
+            COG=0
         latdegminmin=(RMCarray [3])
         GPSNS=(str(RMCarray [4]))
         latnow=dmm2dec(latdegminmin,GPSNS) #current latitude converted to decimal format
@@ -973,8 +991,8 @@ def UDPread():
         if header=="VWR":
             VWRarray=UDPstring.split(",") #VWR - Relative Wind Speed and Angle
             AWA=float(VWRarray[1]) # Wind angle to bow magnitude in degrees
-            AWD=VWRarray[2] # Wind direction Left/Right of bow
-            if AWD=="R":
+            AWB=VWRarray[2] # Wind direction Left/Right of bow
+            if AWB=="R":
                 AWA=AWA
             else:
                 AWA=-AWA
@@ -992,11 +1010,12 @@ def UDPread():
                 TWSmax=TWS
             if TWS<0.1: #Avoid 0 division 
                 TWS=0.1
-            if AWD=="R":
+            if AWB=="R":
                 TWA=math.degrees(math.acos((AWS*math.cos(AWA_rad)-SOGms)/TWS)) # True wind direction (compass)
             else:
                 TWA=math.degrees(-math.acos((AWS*math.cos(AWA_rad)-SOGms)/TWS))
-            TWD=COG+TWA
+            TWD=TWA
+#            TWD=COG+TWA
             if TWD<0:
                 TWD=360+TWD
             if TWD>=360:
@@ -1007,7 +1026,7 @@ def UDPread():
             #print("TWD "+str(TWD))
         if header=="MTW":
             MTWarray=UDPstring.split(",") #MTW - Mean Temperature of Water
-            TSE=float(MTWarray[1]) #Sea temp
+            TSE=MTWarray[1] #Sea temp
         if header=="VHW":
             VHWarray=UDPstring.split(",") #make array according to comma-separation in string
             STW=(VHWarray[3])
@@ -1254,7 +1273,7 @@ def log_update(): # save data to logfile
     #global tempin,tempout,pressure,humidity
     logtripdis= '{:4.1f}'.format(tripdistance)
     logtriptime= triptime/60
-    log_data = [GPSdate,GPSUTC,UTZ, GPSspeed,SOGmax,GPScourse,logtripdis,logtriptime,latdep,londep,latnow,lonnow,latdes,londes,dest,tempin,tempout,humidity,pressure,AWA,AWS,TWD,TWS,TWSmax,BRG,DTW,DEP,TSE]
+    log_data = [GPSdate,GPSUTC,UTZ, SOG,SOGmax,COG,logtripdis,logtriptime,latdep,londep,latnow,lonnow,latdes,londes,dest,tempin,tempout,humidity,pressure,AWA,AWS,TWD,TWS,TWSmax,BRG,DTW,DEP,TSE]
     with open(logname,"a") as f:
         f.write(",".join(str(value) for value in log_data)+ "\n")
 
@@ -1375,8 +1394,8 @@ def menu_status_soft():
     status_list_column.clear()
     status_list_column.append("app ver. " + str(appver))
     status_list_column.append("GPS data" )
-    status_list_column.append("Speed " + str(GPSspeed))
-    status_list_column.append("Course " + str(GPScourse))
+    status_list_column.append("Speed " + str(SOG))
+    status_list_column.append("Course " + str(COG))
     status_list_column.append("Date " + str(GPSdate))
     status_list_column.append("UTC " + str(GPSUTC)[0:6])
     status_list_column.append("Zone " + str(TIMEZ))
@@ -1747,7 +1766,7 @@ but_settings_20 = PushButton(window_settings, lambda:wpt_nav("del"), text="WPT",
 but_settings_30 = PushButton(window_settings, command=ynmenu, args=["connect gps"], text="GPS", width=but_set_width, height=but_set_heigth, grid=[3,0])
 but_settings_01 = PushButton(window_settings, command=window_utz.show, text="ZONE", width=but_set_width, height=but_set_heigth, grid=[0,1])
 but_settings_11 = PushButton(window_settings, text="UNIT", width=but_set_width, height=but_set_heigth, grid=[1,1])
-but_settings_21 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_set_width, height=but_set_heigth, grid=[2,1])
+but_settings_21 = PushButton(window_settings, lambda:single_show("ALLDATA"), text="ALL", width=but_set_width, height=but_set_heigth, grid=[2,1])
 but_settings_31 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_set_width, height=but_set_heigth, grid=[3,1])
 but_settings_02 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_set_width, height=but_set_heigth, grid=[0,2])
 but_settings_12 = PushButton(window_settings, command=window_settings.hide, text="◄", width=but_set_width, height=but_set_heigth, grid=[1,2])
@@ -1828,7 +1847,7 @@ window_GPS = Window(app, title="GPS control", layout="grid")
 window_GPS.tk.attributes("-fullscreen", True)
 window_GPS.text_size=but_text_size
 window_GPS.hide()
-but_GPS_00 = PushButton(window_GPS, lambda:single_show("gpsspeed"), text="SOG", width=but_width, height=but_height, grid=[0,0])
+but_GPS_00 = PushButton(window_GPS, lambda:single_show("SOG"), text="SOG", width=but_width, height=but_height, grid=[0,0])
 but_GPS_10 = PushButton(window_GPS, lambda:single_show("gpshead"), text="COG", width=but_width, height=but_height, grid=[1,0])
 but_GPS_20 = PushButton(window_GPS, lambda:single_show("gpspos"), text="POS", width=but_width+1, height=but_height, grid=[2,0])
 but_GPS_01 = PushButton(window_GPS, lambda:single_show("gpsall"), text="ALL", width=but_width, height=but_height, grid=[0,1])

@@ -1,5 +1,5 @@
 # MAIA Marine server: Handling sensor data transmitted via UDP to use for MAIA application
-appversion=105
+appversion=110
 
 import os
 import glob
@@ -54,7 +54,6 @@ except ImportError:
 
 # NMEA string
 gpsdata="No GPS attached" # string carrying the gps information
-metdata="$GPWEA,0.0,0.0,0000,0.0,0.0," # string carrying the meteorological information (temps, humidity and pressure)
 nmeadata="00000" # string with NMEA sentences from Autohelm
 nmearead="No nmea"
 NMEAstring=None
@@ -64,7 +63,7 @@ udpcounter=0
 metcounter=0
 csvcounter=0
 
-#metdata=[]
+#WEA=[]
 tempin=None
 pressure=None
 humidity=None
@@ -84,6 +83,9 @@ VHW="$IIVHW,,,0.00,N,," #Water speed and heading
 VWR="$IIVWR,0.00,R,0.00,N,,,," #Relative Wind Speed and Angle
 MTW="$IIMTW,0.00,C" #Mean Temperature of Water
 VOL="$IIVOL,0.00,0.00,0.00,V"#Analogue readings of voltage
+RMC="$GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68" # Sample GPS string
+WEA="$GPWEA,0.0,0.0,0000,0.0,0.0," # string carrying the meteorological information (temps, humidity and pressure)
+#WEA=[]
 
 # Instrument Variables
 DEP=0 #Depth
@@ -99,19 +101,7 @@ STW=0 #log: speed through water
 # GPS
 GPSstring=None
 #GPS variables
-latdep=None #Position of departure
-londep=None
-latnow=None #55.942508 #Current position in DEGDEC format
-lonnow=None #11.870814
-latnowdms=None #Current position in DMS format
-lonnowdms=None
-latdes=None # Default position of destination if no GPS
-londes=None
-latdesdms=None
-londesdms=None
-latbef=None #Last destination measured (for calculating trip distance)
-lonbef=None
-GPSspeed=0
+SOG=0
 COG=0
 GPSNS=None #N or S
 GPSEW=None #E or W
@@ -126,15 +116,15 @@ engine_battery  = 1
 spare_battery  = 2
 
 # LOG FILE
+logdir='/home/pi/csv/'
+dir = os.path.join(str(logdir))
+if not os.path.exists(dir):
+    os.mkdir(dir)
 log_data = []
-logname='/home/pi/csv/' + 'time' + '.csv' # name will change according to time for each new file created
+logname=str(logdir) + 'time' + '.csv' # name will change according to time for each new file created
 logfile_created=False # Is log file created when GPS Date is received?
-log_update=60 #seconds between each log update
-log_header = ["Date","UTC","UTZ", "SOG","SOGmax","COG","tripdistance",
-            "triptime(min)","latdep","londep","Latitude","Longitude",
-            "latdes","londes","destination","tempin","tempout","humidity",
-            "HPa","AWA","AWS","TWD","TWS","TWSmax","BRG","DTW","Depth","SEA"]
-
+log_update_interval=60 #seconds between each log update
+log_header = ["Date","UTC", "SOG","SOGmax","COG","tempin","tempout","humidity","HPa","AWA","AWS","TWD","TWS","TWSmax","Depth","SEA"]
 
 #SERIAL SETUP
 port1 = "/dev/ttyUSB0"  # USB serial (Adafruit GPS etc)
@@ -145,7 +135,7 @@ port5 = "/dev/ttyAMA0"  # RPi Zero GPIO PIN 10
 port6 = "/dev/ttyS0"    # RPi 3 + Zero PIN 10
 serialGPS=False # Check if GPS is available at serial port
 portGPS=port3
-portNMEA = port6
+portNMEA = port5
 
 baudGPS=9600 # baudrate for GPS port
 baudNMEA=4800 # baudrate for NMEA 
@@ -163,7 +153,7 @@ except:
 # Setting up NMEA input at GPIO
 try:
     sernmea = serial.Serial(portNMEA, baudrate = baudNMEA, timeout=porttimeout)
-    print("Serial connection for NMEA ready at GPIO pin 15 with baudrate " + str(baudNMEA))
+    print("Serial connection for NMEA ready at GPIO 15 pin 10 with baudrate " + str(baudNMEA))
 except:
     print("no serial connection for NMEA")
 
@@ -179,7 +169,7 @@ def ReadChannel(channel):
  
 # Converting data to voltage level,
 def ConvertVolts(data,places):
-  volts = (data * 24) / float(1023)
+  volts = (data * 23) / float(1023)
   volts = round(volts,places)
   return volts
 
@@ -204,82 +194,105 @@ def ReadVolts():
     VOL="$IIVOL," + str(consume_volts) + "," + str(engine_volts) +"," + str(spare_volts) + ",V"
 
 def NMEAread():
-    global nmeadata,DBT,VHW,VWR,MTW,TWS,TWSmax,NMEAstring
+    global nmeadata,DBT,VHW,VWR,MTW,TWS,TWSmax,NMEAstring,gpsdata,RMC,VOL,WEA
     # Read NMEA0183 serial instrument data from Autohelm converter
     NMEAstring = sernmea.readline().decode('ascii', errors='replace')
+    #NMEAstring = sernmea.readline().decode()
     print(NMEAstring)
     if len(str(NMEAstring))>8:
         header = NMEAstring[3:6] # slicing out the header information (3 letters needed)
         if header=="DBT": 
             DBT=NMEAstring
+            print(DBT)
         if header=="VHW": 
             VHW=NMEAstring
+            print(VHW)
         if header=="VWR": 
             VWR=NMEAstring
             VWRarray=NMEAstring.split(",") #make array according to comma-separation in string
-            TWS=(VWRarray [1])
+            TWS=float(VWRarray [1])
             if TWS>TWSmax:
                 TWSmax=TWS  
+            print(VWR)
         if header=="MTW": 
             MTW=NMEAstring
+        if header=="VOL": 
+            VOL=NMEAstring
+        if header=="WEA": 
+            WEA=NMEAstring
+        if header=="RMC": # the line containing the needed information like position, time and speed etc....
+            RMC=NMEAstring
+            RMCsplit(NMEAstring)
 
 def GPSread():
-    global GPSstring,gpsdata,NMEAstring
-    global UTC,GPSdate,GPSspeed,COG,GPSNS,GPSEW,SOG,COG,SOGmax
-    global gpsdata,UTZ,UTZhours,TIMEZ,UTCOS,GPSNS,GPSEW,dayname,UDPupdate,daynumber
-
-    # Check if GPS info is sent to the serial port
-    SERstring = sernmea.readline().decode('ascii', errors='replace')
+    global RMC
     if serialGPS==True: # Read GPS from USB instead
-        SERstring = serGPS.readline().decode('ascii', errors='replace')
-        #print ("GPS data: " + str(gpsread))
+        gpsdata = serGPS.readline().decode('ascii', errors='replace')
+        header = gpsdata[3:6]
+        if header=="RMC": # the line containing the needed information like position, time and speed etc....
+            RMC=gpsdata
+            RMCsplit(RMC)
+            if logfile_created==False:
+                log_create()
 
-    header = SERstring[3:6]
-    if header=="RMC": # the line containing the needed information like position, time and speed etc....
-        RMCarray=GPSstring.split(",") #make array according to comma-separation in string
-        UTC=(RMCarray [1])
-        GPSdate=(RMCarray [9])
+def RMCsplit(RMCstring):
+    global UTC,GPSdate,COG,SOG,COG,SOGmax
+    RMCarray=RMCstring.split(",") #make array according to comma-separation in string
+    print (RMCarray)
+    UTC=(RMCarray [1])
+    GPSdate=(RMCarray [9])
+    try:
         SOG=(float(RMCarray [7])) # knots
-        if SOG>SOGmax:
-            SOGmax=SOG
-        if RMCarray [8]!="":
+    except:
+        SOG=0
+    if SOG>SOGmax:
+        SOGmax=SOG
+    COG=0
+    if RMCarray [8]!="":
+        try:
             COG=(float(RMCarray [8]))
-        else:
+        except:
             COG=0
-        log_create()
-
+    
 def UDPmessage():
-    metbytes = str.encode(metdata)
-    gpsbytes = str.encode(gpsdata)
+    
+    udp = socket(AF_INET, SOCK_DGRAM)
+    print ("IP: " + str(udp.getsockname()[0]))
+    udp.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+    udp.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
+    
+    METbytes = str.encode(WEA)
+    RMCbytes = str.encode(RMC)
     DBTbytes = str.encode(DBT)
     VHWbytes = str.encode(VHW)
     VWRbytes = str.encode(VWR)
     MTWbytes = str.encode(MTW)
     VOLbytes = str.encode(VOL)
     
-    udp = socket(AF_INET, SOCK_DGRAM)
-    udp.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-    udp.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
-    udp.sendto(metbytes, (UDPaddress, UDPport))
-    print ("Weather data sent:" +str(metdata))
+    udp.sendto(METbytes, (UDPaddress, UDPport))
+    print ("Weather data sent:" +str(METbytes))
     sleep(0.1)
-    udp.sendto(gpsbytes, (UDPaddress, UDPport))
+    udp.sendto(RMCbytes, (UDPaddress, UDPport))
     print ("GPS data sent:" +str(gpsdata))
     sleep(0.1)
     udp.sendto(VOLbytes, (UDPaddress, UDPport))
     print ("VOLTAGE data sent:" +str(VOLbytes))
+    sleep(0.1)
     udp.sendto(DBTbytes, (UDPaddress, UDPport))
     print ("DEPTH data sent:" +str(DBTbytes))
+    sleep(0.1)
     udp.sendto(VHWbytes, (UDPaddress, UDPport))
     print ("LOG SPEED data sent:" +str(VHWbytes))
+    sleep(0.1)
     udp.sendto(VWRbytes, (UDPaddress, UDPport))
     print ("WIND data sent:" +str(VWRbytes))
+    sleep(0.1)
     udp.sendto(MTWbytes, (UDPaddress, UDPport))
     print ("SEA TEMP data sent:" +str(MTWbytes))
 
-def metsensors():
+def weasensors():
     # Reading data from meteorological sensors BMP280 and DHT22
-    global metdata,tempin,pressure,humidity,tempout
+    global WEA,tempin,pressure,humidity,tempout
     try:
         tempin = '{:4.1f}'.format(measurebmp.get_temperature())
         print ("indoor temp deg C: " + str(tempin))
@@ -295,8 +308,9 @@ def metsensors():
         print ("humidity %: " + str(humidity))
     except:
         print("DHT error")
-    metdata = "$GPWEA," + str(tempin) + "," + str(tempout) + "," + str(pressure) + "," + str(humidity) + "," + str(t18B20) + "," + " "  
-    print (metdata)
+    WEA="$GPWEA," + str(tempin) + "," + str(tempout) + "," + str(pressure) + "," + str(humidity) + "," + str(t18B20) + "," + " "  
+    #print (WEA)
+    sleep(10)
 
 def metcsv():
     # update csv file with readings
@@ -315,7 +329,7 @@ TempIDs = ["BLACK", "28-000005b16567", "out", "Outside temperature", "16", "X"],
 	  ["RED", "28-000005b22544", "dining", "Dining Room", "24", "X"],\
 	  ["ORANGE", "28-000005b1725b", "living", "Living Room", "25", "X"],\
 	  ["LOST BROWN", "28-000005b1a9e9", "xx", "xx", "26", "X"],\
-	  ["ELMA", "28-000009130002", "Elma", "Elma test sensor", "27", "Z"]
+	  ["ELMA", "28-000009130002", "Elma", "Elma sensor", "27", "Z"]
     
 def TermoRead():
     #Compare the two arrays in order to know which sensors to use
@@ -370,7 +384,7 @@ def log_create():
         else:
             logname='C:\\Users\\bonde\\Dropbox\\Code\\Python\\MAIA\\' + "MAIAserver" + '.csv' 
         with open(logname,"w") as f:
-            f.write(",".join(str(value) for value in log_header)+ "\n")
+            f.write(",".join(str(value) for value in log_header) + "\n")
         print ("New log created: " + str(logname))
         logfile_created=True
         log_update()
@@ -379,9 +393,7 @@ def log_update(): # save data to logfile
     global log_data
     #global tempin,tempout,pressure,humidity
     if logfile_created==True:       
-        log_data = [GPSdate,UTC,"UTZ", GPSspeed,SOGmax,COG,"logtripdis",
-            "logtriptime",latdep,londep,latnow,lonnow,latdes,londes,
-            "dest",tempin,tempout,humidity,pressure,AWA,AWS,TWD,TWS,TWSmax,"BRG","DTW",DEP,TSE]
+        log_data = [GPSdate,UTC,SOG,SOGmax,COG,tempin,tempout,humidity,pressure,AWA,AWS,TWD,TWS,TWSmax,DEP,TSE]
         with open(logname,"a") as f:
             f.write(",".join(str(value) for value in log_data)+ "\n")
 
@@ -400,15 +412,24 @@ buzzer.on()
 sleep(0.2)
 buzzer.off()
 
-base_dir = '/sys/bus/w1/devices/'
-os.chdir(base_dir)
-print("directory changed to")
-print(base_dir)
-print("Detecting 18B20 devices ")
-deviceIDs=glob.glob('28*')
-print ("Total amount of tested sensors: " + str(len(TempIDs)))
-print ("Amount of attached temp sensors: " + str(len(deviceIDs)))
-print ("ID of attached sensors: " + str(deviceIDs))
+try:
+    base_dir = '/sys/bus/w1/devices/'
+    os.chdir(base_dir)
+    print("directory changed to")
+    print(base_dir)
+    print("Detecting 18B20 devices ")
+    deviceIDs=glob.glob('28*')
+    print ("Total amount of tested sensors: " + str(len(TempIDs)))
+    print ("Amount of attached temp sensors: " + str(len(deviceIDs)))
+    print ("ID of attached sensors: " + str(deviceIDs))
+except:
+    print("no 18B20 devices")
+
+#w=Thread(target=weasensors)
+#w.start
+
+#ipadress=socket(getaddrinfo)
+#print(ipadress)
 
 while True:
     csvcounter+=1
@@ -418,13 +439,14 @@ while True:
     GPSread()
     sleep(0.2)
     if metcounter==20:
-        metsensors()
+        weasensors()
         TermoRead()
         ReadVolts()
         metcounter=0
-    if csvcounter==log_update:
-        log_update()
-        csvcounter=0
+    if logfile_created==True:
+        if csvcounter==log_update_interval:
+            log_update()
+            csvcounter=0
     UDPmessage()
     sleep(0.6)
     #print(nmearead)
