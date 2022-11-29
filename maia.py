@@ -1,6 +1,6 @@
 #!/usr/bin/python
-# Maritime application for use with touch displays
-appver="191" # for displaying software version in the status window
+print("MAIA  MAritime Information Application for use with touch displays")
+appver="232" # for displaying software version in the status window
 # Installation and configuration guide at https://github.com/jbonde/MAIA/blob/master/installation
 
 from guizero import App, Text, PushButton, Window, ListBox, Box, Picture, Drawing
@@ -29,6 +29,7 @@ elif OSplatform=="Linux": # Assuming RPi as hardware
     print("gpioimport=True")
     try:
         import mypi #script to check hardware
+        print("mypi installed")
     except:
         print("mypi not installed")
 
@@ -42,7 +43,7 @@ homise="hms" #hours - minutes - seconds interval
 downcount=5 #default countdown time
 
 #Racing
-racecountdown=True #For deciding if counter goes down before race or up after start of race
+countdown=True #For deciding if counter goes down before race or up after start of race
 racecount=0 #Counter for race countdow
 but_race_text=None
 but_race="05:00"
@@ -59,7 +60,7 @@ but_width=7 #Standard width of push buttons. Total width of 7+7+8=22 matches a 4
 but_height=4
 but_text_size=35
 but_text_medsize=80
-but_text_bigsize=150
+but_text_bigsize=130
 key_width=None #Keyboard buttons
 key_height=None
 posmode=True # black text n white back. Opposite if False
@@ -74,49 +75,57 @@ VOL3=0
 #Met variables
 tempin=0
 tempout=0
-temp18B20=0
+tempENGINE=0
 pressure=0
 altitude=0
 seapressure=0
 humidity=0
 
 #GPS variables
-latdep=None #Position of departure
-londep=None
-latnow=None #55.942508 #Current position in DEGDEC format
-lonnow=None #11.870814
-latnowdms=None #Current position in DMS format
-lonnowdms=None
-latdes=None # Default position of destination if no GPS
-londes=None
-latdesdms=None
-londesdms=None
-latbef=None #Last destination measured (for calculating trip distance)
-lonbef=None
-GPSNS=None #N or S
-GPSEW=None #E or W
-GPSUTC=None #Time in UTC format
-UTCOS=None # Time string formatted for OS time update when out of network
-GPSdate=210101 #Date received from GPS
-latdegminmin=None
-londegminmin=None
+latdep=0 #Position of departure
+londep=0
+latnow=0 #55.942508 #Current position in DEGDEC format
+lonnow=0 #11.870814
+latnowdms=0 #Current position in DMS format
+lonnowdms=0
+latdes=0 # Default position of destination if no GPS
+londes=0
+latdesdms=0
+londesdms=0
+latbef=0 #Last destination measured (for calculating trip distance)
+lonbef=0
+GPSNS="" #N or S
+GPSEW="" #E or W
+UTC=0 #Time in UTC format
+UTCOS=0 # Time string formatted for OS time update when out of network
+GPSdate=0 #Date received from GPS
+latdegminmin=0
+londegminmin=0
 COG=0 #Course over ground
 SOG=0 #Speed over ground
 SOGmax=0 # Max speed at trip
 
 #Seatalk 1 variables
 DEP=0 #Depth
+AWS=0 #Apparent wind speed
+AWA=0 #Apparent wind angle
+TSE=0 #Sea temperature
+STW=0 #log: speed through water : $IIVHW
+MAG=0 # Magnetic Compass heading : $IIVHW
+AUTON=False # True if Auto pilot turned on
+AUTONCOUNT=0 # Time out for auto pilot active
+AUTSET=False # True if Auto pilot active
+AUTSETCOUNT=0 # Time out for auto pilot auto setting
+AUT=0 # Auto pilot heading
+windknots=False # If wind data is transmitted as knots. Else m/s
+
+# Calculated on basis of ST1 and GPSinfo
 TWS=0 #True wind speed
 TWSmax=0 # Max wind speed
 TWD=0 #True wind direction
-TWA=0 #True wind angle to COG
-AWS=0 #Apparent wind speed
-AWA=0 #Apparent wind angle
-TSE=None #Sea temperature
-STW=0 #log: speed through water
 
 # UDP and MET commands
-UDPstring=None
+NMEAstring=None
 UDPaddress=None
 UDPupdatedef=5 # default time to wait for UDP string. If below 0 texts will be red
 UDPupdate=UDPupdatedef # Counting time to wait for UDP string
@@ -335,7 +344,7 @@ def downcounter(t):
         single_show(mode)
 
 def racing():
-    global racecount,racecountdown,but_race_color,but_race_text,but_race,but_raceup,but_racedown,mode
+    global racecount,countdown,but_race_color,but_race_text,but_race,but_raceup,but_racedown,mode
     #= Race countdown form
     mode="race"
     window_race = Window(app, title="Race")
@@ -344,7 +353,7 @@ def racing():
     but_race = PushButton(window_race, command=window_race.hide, height=but_height-3, width="fill")
     but_raceup = PushButton(window_race, command=racedown, text="▼", width=11, height=but_height-2, align="right")
     but_racedown = PushButton(window_race, command=raceup, text="▲", width=11, height=but_height-2, align="left")
-    racecountdown=True
+    countdown=True
     racecount=300 #start race timer at 5 mins
     but_race.text=" "
     window_race.show()
@@ -361,23 +370,31 @@ def raceup():
     racecount=racemin*60+1
     
 def timer_update():
-    global counting,racecountdown,homise
-    global GPSUTC,GPSdate,SOG,COG,GPSNS,GPSEW,latnow,lonnow,latnowdms,lonnowdms,TTG,ETA,UTZ,UTCOS
+    global counting,countdown,homise
+    global UTC,GPSdate,SOG,COG,GPSNS,GPSEW,latnow,lonnow,latnowdms,lonnowdms,TTG,ETA,UTZ,UTCOS
     global mode, but_text_bigsize, but_text_medsize
     global tempin, tempout, pressure, altitude, seapressure,humidity
     global racecount,but_race_color,but_race_text,but_race,but_raceup,but_racedown,downcount
     global tripdistance,tripcount,triptime,latint,lonint,tripaver,tripinterval,latsec,lonsec,tripsecelapsed,tripsec
-    global navlog,DTW,BRG,AVSlog,AVSlat,AVSlon
+    global navlog,DTW,BRG,AVSlog,AVSlat,AVSlon,MAG
     global logfile_created,UDPupdate,colorfor,colorback
+    global AUTSETCOUNT,AUTONCOUNT,AUTSET,AUTON,AUT
 
 #   Updating single display depending on function selected in menus
     but_single.text=str(mode) # Show mode if there is no data
     counting=counting+1 #seconds
     UDPupdate-=1 #counting down UDP update if not reset by UDP loop
+    AUTONCOUNT-=1 # time out for active auto pilot
+    AUTSETCOUNT-=1 # time out of auto pilot in auto mode if no HSC sentences are recieved
+    if AUTSETCOUNT <1:
+        AUTSET=False
+        AUT=0
+    if AUTONCOUNT <1:
+        AUTON=False
     ms=time.strftime("%M:%S", time.gmtime(counting)) #stop watch display as M+S
     #dm=time.strftime ("%A\n" + "%d " + "%B") #displaying the actual date
 
-    if latnow != None: #Functions that will only run when GPS is ready
+    if GPSdate!=0: #Functions that will only run when GPS is ready
  #       if logfile_created==False:
  #           log_create()
  #           logfile_created=True
@@ -385,16 +402,25 @@ def timer_update():
         if AVSlog==False: # Functions running once when GPS is ready
             AVSlat=latnow
             AVSlon=lonnow
-            UTCOS = "20" + str(GPSdate)[4:] + "-" + str(GPSdate)[2:4] + "-" + str(GPSdate)[0:2] + " " + str(GPSUTC)[0:2] + ":" + str(GPSUTC)[2:4] + ":" + str(GPSUTC)[4:6] #UTC time formatted to use for OS clock
+            UTCOS = "20" + str(GPSdate)[4:] + "-" + str(GPSdate)[2:4] + "-" + str(GPSdate)[0:2] + " " + str(UTC)[0:2] + ":" + str(UTC)[2:4] + ":" + str(UTC)[4:6] #UTC time formatted to use for OS clock
             if OSplatform=="Linux":
-                subprocess.Popen(["sudo", "date", "-s", UTCOS])
-            but_trip_start.enabled=True
+                timestring="20" + str(GPSdate)[4:6]+"-"+str(GPSdate)[2:4]+"-"+str(GPSdate)[0:2]+" "+str(UTC)[0:2]+":"+str(UTC)[2:4]+":"+str(UTC)[4:6]
+                print("timestring: " + str(timestring))
+                try:
+                    subprocess.run(['sudo','date','-s',str(timestring)])
+                    print("Date set to UTC")
+                except:
+                    print("timestring not set")
+            but_dep_start.enabled=True
         AVSlog=True
         AVSupdate()
         if latdes != None:
             DTW=WPTdistance(latnow,lonnow,latdes,londes) #calculate distance to waypoint in nm if GPS is live and a destination is selected
             DTW=str(DTW)[0:4]
-            TTGsec=int((float(DTW))*3600/SOG)# Find Time-to-go in seconds. Replace SOG with AVS
+            if SOG>0:
+                TTGsec=int((float(DTW))*3600/SOG)# Find Time-to-go in seconds. Replace SOG with AVS
+            else:
+                TTGsec=1
             TTG=str(timedelta(0,TTGsec))
             BRG=float(WPTbearing(latnow,lonnow,latdes,londes)) #calculate bearing to waypoint
             timenow=datetime.now()
@@ -415,68 +441,94 @@ def timer_update():
                 log_update() # append current log data to log file
                 tripcount=0
     if mode=="ALLDATA":
-        but_single.text_size=int(but_text_medsize/3.0)
+        but_single.text_size=int(but_text_medsize/2.8)
         SOGstring='{:3.1f}'.format(float(SOG)) #str(SOG)
         but_single.text = \
-            "Date " + str(GPSdate) + " " + "UTC " + GPSUTC[0:2] + ":" + GPSUTC[2:4] + "\n" \
-            + str(latnowdms) + str(GPSNS) + " " + str(lonnowdms) + str(GPSEW) + "\n" \
+            "Date " + str(GPSdate) + " " + "UTC " + str(UTC)[0:2] + ":" + str(UTC)[2:4] + "\n" \
+            + "POS " + str(latnowdms) + str(GPSNS) + " " + str(lonnowdms) + str(GPSEW) + "\n" \
             + "SOG " + str(SOGstring) + " "  + "COG " + str(COG) + "\n" \
-            + "tIn " + str(tempin) + " tOut " + str(tempout)+ " 18B20 " +  '{:3.1f}'.format(float(temp18B20)) + "\n" \
+            + "tIn " + str(tempin) + " tOut " + str(tempout)+ " tENG " +  '{:3.1f}'.format(float(tempENGINE)) + "\n" \
             + "hPa " + str(pressure) + " hum " + str(humidity) + " %"  + "\n" \
-            + "AWS " + '{:3.1f}'.format(AWS) + " AWA " + str(int(AWA)).zfill(3) + " TWS " + '{:3.1f}'.format(TWS) + " TWD " + str(int(TWD)).zfill(3) + "\n" \
+            + "AWS " + str(AWS) + " AWA " + str(int(AWA)).zfill(3) + " TWS " + '{:3.1f}'.format(TWS) + " TWD " + str(int(TWD)).zfill(3) + "\n" \
             + "DEPTH " + '{:3.1f}'.format(float(DEP)) + " STW " + '{:3.1f}'.format(float(STW)) + "\n" \
-            + "VOL1 "+ str(VOL1) + " " + "VOL2 "+ str(VOL2) + " " + "VOL3 " + str(VOL3) 
+            + "Cons "+ str(VOL1) + " " + "Eng "+ str(VOL2) + " " + "Spare " + str(VOL3) 
     if mode=="tIN":
         #if BMP280import==True:
         #    tempin = '{:4.1f}'.format(measurebmp.get_temperature())
-        but_single.text=str(tempin) # + " °C"
+        but_single.text="tIN" + "\n" + str(tempin) + "°C"
     if mode=="hPa":
-        #if BMP280import==True:
-        #    pressure = '{:4.0f}'.format(measurebmp.get_pressure())
-        but_single.text=str(pressure) # + " hPa"  
+        but_single.text_size=int(but_text_bigsize/1.2)
+        but_single.text="PRES" + "\n" + str(pressure) + " hPa"  
     if mode=="tOUT":
         #if DHT22import==True:
 #            DHT_SENSOR = Adafruit_DHT.DHT22
 #            DHT_PIN = 4
         #    humidity, tempout = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
         #    tempout = '{:4.1f}'.format(tempout)
-        but_single.text=str(tempout) # + " °C"
+        but_single.text="tOUT" + "\n" + str(tempout) + "°C"
     if mode=="HUM":
         #if DHT22import==True:
 #            DHT_SENSOR = Adafruit_DHT.DHT22
 #            DHT_PIN = 4
         #    humidity, tempout = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
         #    humidity = '{:2.0f}'.format(humidity)
-        but_single.text=str(humidity) + " %"     
-    if mode=="t18B20":
-        but_single.text=str(temp18B20) # + " °C"    
+        but_single.text="HUM" + "\n" + str(humidity) + " %"     
+    if mode=="tENG":
+        but_single.text="tENG" + "\n" + str(tempENGINE) + "°C"    
     if mode=="dash":
         dashboard_update()
     if mode=="gpsall":
         but_single.text_size=but_text_medsize-20
         SOGstring='{:3.1f}'.format(float(SOG)) #str(SOG)
-        but_single.text=str(latnowdms)+ str(GPSNS) + "\n" + str(lonnowdms) + str(GPSEW)  + "\n" + "Speed " + str(SOGstring) + "\n" + "Course " + str(COG)
+        but_single.text=str(latnowdms)+ str(GPSNS) + "\n" + str(lonnowdms) + str(GPSEW) + "\n" + "Speed " + str(SOGstring) + "\n" + "Course " + str(COG)[0:3]
     if mode=="gpspos":
         but_single.text_size=but_text_medsize
         but_single.text=str(latnowdms) + str(GPSNS) + "\n" + str(lonnowdms) + str(GPSEW) 
     if mode=="SOG": # current speed in nm as fetched from GPS
-        SOGstring='{:3.1f}'.format(float(SOG)) #str(SOG)
-        but_single.text=SOGstring
+        SOGstring=str('{:3.1f}'.format(float(SOG))) #str(SOG)
+        but_single.text="SOG" + "\n" + SOGstring + " kts"
+    if mode=="SOGmax": # current speed in nm as fetched from GPS
+        SOGmaxstring=str('{:3.1f}'.format(float(SOGmax))) #str(SOG)
+        but_single.text="SOGmax" + "\n" + SOGmaxstring + " kts"
+    if mode=="TWSmax": # current speed in nm as fetched from GPS
+        TWSmaxstring=str('{:3.1f}'.format(float(TWSmax))) #str(SOG)
+        but_single.text="TWSmax" + "\n" + TWSmaxstring + " kts"
     if mode=="gpshead":
         if str(COG)[2:3]==".":
-            but_single.text=str(COG)[0:2]
+            but_single.text="COG" + "\n" + str(COG)[0:2] + "°"
         else:
-            but_single.text=str(COG)[0:3]
+            but_single.text="COG" + "\n" + str(COG)[0:3] + "°"
     if mode=="DEP": # current depth
-        but_single.text='{:3.1f}'.format(float(DEP)) #str(DEP)
+        but_single.text="DEPTH" + "\n" + str('{:3.1f}'.format(float(DEP))) + " m" #str(DEP) 
     if mode=="TWS": # true wind speed
-        but_single.text='{:3.1f}'.format(TWS) #str(TWS)
+        but_single.text="TWS" + "\n" + str('{:3.1f}'.format(TWS)) + " m/s" #str(TWS)
     if mode=="TWD": # true wind angle
-        but_single.text=str(int(TWD)).zfill(3) #(TWD)
+        but_single.text="TWD" + "\n"  + str(int(TWD)).zfill(3) + "°" #(TWD)
     if mode=="STW": # speed through water
-        but_single.text='{:3.1f}'.format(float(STW)) #str(STW)
+        but_single.text="STW" + "\n" + str('{:3.1f}'.format(float(STW))) + " kts" #str(STW)
     if mode=="TSE": # sea temp
-        but_single.text=str(TSE)
+        but_single.text="tSea " + "\n" + str(TSE) + "°C"
+    if mode=="VOL": # voltages
+        but_single.text_size=int(but_text_medsize/1.6)
+        but_single.text="Consume " + str(VOL1) + " V" + "\n" + "Engine " + str(VOL2) + " V" + "\n" + "Windlass " + str(VOL3) + " V"
+    if mode=="VOL1": # Consume battery 
+        but_single.text="Cons."+ "\n" + str(VOL1) + " V"
+    if mode=="VOL2": # Engine battery 
+        but_single.text="Engine"+ "\n" + str(VOL2) + " V"
+    if mode=="MAG": # Compass heading
+        try:
+            MAG='{:3.0f}'.format(float(MAG))
+        except:
+            MAG=MAG
+        but_single.text_size=int(but_text_medsize/1.1)
+        but_single.text="COMPASS" + "\n" + str(MAG) + "°"
+    if mode=="PILOT": # Auto pilot data
+        try:
+            AUT='{:3.0f}'.format(float(AUT))
+        except:
+            AUT=AUT
+        but_single.text_size=int(but_text_medsize/1.2)
+        but_single.text="Pilot on: " + str(AUTON) + "  " + "\n" + "Auto: " + str(AUTSET) + "  " + "\n" + "Heading " + str(AUT) + "°"
     if mode=="stop":
         but_single.text=ms
     if mode=="down":
@@ -491,9 +543,9 @@ def timer_update():
         downcount-=1
     if mode=="time":     
         but_single.text_size=but_text_medsize
-        but_single.text="UTC " + GPSUTC[0:2] + ":" + GPSUTC[2:4] + "\n" + "UTZ " + UTZ[0:2] + ":" + UTZ[2:4]
+        but_single.text="UTC " + str(UTC[0:2]) + ":" + str(UTC[2:4]) + "\n" + "UTZ " + str(UTZ[0:2]) + ":" + str(UTZ[2:4])
     if mode=="utc":     
-        but_single.text=GPSUTC[0:2]+":"+GPSUTC[2:4] #UTC hours and minutes separated by :
+        but_single.text=UTC[0:2]+":"+UTC[2:4] #UTC hours and minutes separated by :
     if mode=="utz":
         but_single.text=UTZ[0:2]+":"+UTZ[2:4] #UTZ hours and minutes separated by :
     if mode=="date":
@@ -501,13 +553,13 @@ def timer_update():
         but_single.text=str(GPSdate)
 #        but_single.text=str(dayname)+ "\n" + str(GPSdate)
     if mode=="DTW":
-        but_single.text=str(DTW)[0:5] # Chopping off some small digits
+        but_single.text="DTW" + "\n" + str(DTW) + "nm" # Chopping off some small digits
     if mode=="navbear":
-        but_single.text=str(int(BRG)).zfill(3)
+        but_single.text="BRG" + "\n" + str(int(BRG)).zfill(3) + "°"
     if mode=="navttg": #
         if len(TTG)>9:
             TTGarray=TTG.split(",")
-            TTGtext=str(TTGarray [0]) + "\n" + str(TTGarray [1])
+            TTGtext="TTG" + "\n" + str(TTGarray [0]) + "\n" + str(TTGarray [1])
             but_single.text_size=but_text_medsize
         else:
             TTGtext=TTG
@@ -515,21 +567,21 @@ def timer_update():
         but_single.text=TTGtext
     if mode=="naveta": #  
         but_single.text_size=but_text_medsize
-        but_single.text=(str(ETA)[:10] + "\n" + str(ETA)[11:19])
+        but_single.text="ETA" + "\n" + (str(ETA)[:10] + "\n" + str(ETA)[11:19])
     if mode=="MOBnow": #
         but_single.text_size=but_text_medsize
         but_single.text="MOB" + "\n" + str(DTW)[0:5] + "\n" + str(BRG)
     if mode=="tripdist":
-        but_single.text=str(tripsecelapsed)[:5]
+        but_single.text="TRIP" + "\n" + str(tripsecelapsed)[:3] + " nm"
     if mode=="triptime":
         tt=time.strftime("%H:%M:%S", time.gmtime(triptime)) #elapsed time as HMS
         but_single.text_size=but_text_medsize+20
         but_single.text=tt
     if mode=="tripaver":
         tripaver=3600*tripsecelapsed/triptime
-        but_single.text=str(tripaver)[:4]
+        but_single.text="AVS kts" + "\n" + str(tripaver)[:4]
     if mode=="race":        
-        if racecountdown==True:
+        if countdown==True:
             racecount=racecount-1
             but_race.text_size=but_text_bigsize
             but_race.text_color="red"
@@ -544,7 +596,7 @@ def timer_update():
             but_race_text=time.strftime("%M:%S", time.gmtime(racecount))
             but_race.text=but_race_text
         if racecount==0:
-            racecountdown=False      
+            countdown=False      
 #    if UDPupdate==0:
 #        colorfor="red"
 #        display_update()
@@ -613,18 +665,18 @@ def display_update():
     '''
     window_avs.text_color=colorfor
     window_avs.bg=colorback
-    window_racecountdown.text_color=colorfor
-    window_racecountdown.bg=colorback
+    window_countdown.text_color=colorfor
+    window_countdown.bg=colorback
     window_GPS.text_color=colorfor
     window_GPS.bg=colorback
     window_key.text_color=colorfor
     window_key.bg=colorback
-    window_met.text_color=colorfor
-    window_met.bg=colorback
-    window_met_graph.text_color=colorfor
-    window_met_graph.bg=colorback
-    window_nav.text_color=colorfor
-    window_nav.bg=colorback
+    window_wea.text_color=colorfor
+    window_wea.bg=colorback
+    window_wea_graph.text_color=colorfor
+    window_wea_graph.bg=colorback
+    window_des.text_color=colorfor
+    window_des.bg=colorback
     window_num.text_color=colorfor
     window_num.bg=colorback
     window_service.text_color=colorfor
@@ -637,8 +689,8 @@ def display_update():
     window_status.bg=colorback
     window_system.text_color=colorfor
     window_system.bg=colorback    
-    window_trip.text_color=colorfor
-    window_trip.bg=colorback
+    window_dep.text_color=colorfor
+    window_dep.bg=colorback
     window_timer.text_color=colorfor
     window_timer.bg=colorback
     window_utz.text_color=colorfor
@@ -825,11 +877,12 @@ def dashboard_update():
         drawing_angle_offset=0 # North up
         compass_direction="North up"
     ETAstring=("ETA " + str(ETA)[:10] + " " + str(ETA)[11:16])
-    UTCstring=("UTC " + str(GPSUTC)[:2] + ":" + str(GPSUTC)[2:4])
+    UTCstring=("UTC " + str(UTC)[:2] + ":" + str(UTC)[2:4])
     dash_drawing.text(10, 10,compass_direction,color=dash_drawing_text_color,size=int(dash_drawing_text_size/2)) # Set compass corner texts
     dash_drawing.text(screen_centerX+circle_radius-2*inner_circle, 10,UTCstring,color=dash_drawing_text_color,size=int(dash_drawing_text_size/2)) # Set compass corner texts
     dash_drawing.text(10,screen_height-2*int(dash_drawing_text_size),dest,color=dash_drawing_text_color,size=int(dash_drawing_text_size/2)) # Set compass corner texts
     dash_drawing.text(10,screen_height-int(dash_drawing_text_size),ETAstring,color=dash_drawing_text_color,size=int(dash_drawing_text_size/2)) # Set compass corner texts
+    dash_drawing.text(screen_centerX+circle_radius-2*inner_circle,screen_height-int(dash_drawing_text_size),"Compass " + str(MAG)[:3],color=dash_drawing_text_color,size=int(dash_drawing_text_size/2)) # Set compass corner text = Magnetic compass
 
     # Create compass
     compass_corner=["N","W","S","E"]
@@ -862,8 +915,8 @@ def dashboard_update():
 #    metpng="//192.168.0.105/PiShare/met.png"
     #graphurl = "http://" + str(UDPaddress) + "/met.png" 
     #metpicture.show()
-    #window_met_graph.show()
-    #window_met_graph.when_clicked=window_met_graph.hide()
+    #window_wea_graph.show()
+    #window_wea_graph.when_clicked=window_wea_graph.hide()
 
     #metpng = curl -O graphurl
     #metpng = curl -O http://192.168.0.105/met.png
@@ -896,13 +949,13 @@ def serinit():
 def GPSread():
     # read and split GPS data from serial port or UDP
     # format:  $GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68
-    global GPSUTC,GPSdate,COG,GPSNS,GPSEW,SOG,SOGmax
+    global UTC,GPSdate,COG,GPSNS,GPSEW,SOG,SOGmax
     global ser,gpsdata,UTZ,UTZhours,TIMEZ,UTCOS,GPSNS,GPSEW,dayname,UDPupdate,daynumber
     global latnow,lonnow,latnowdms,lonnowdms,londegminmin,latdegminmin
     if GPSUSB==True:  # Fetch GPS data from USB instead of UDP
         gpsdata = ser.readline().decode('ascii', errors='replace') #wait for each full line        
     else:   # Fetch GPS data from UDP instead of USB
-        gpsdata=UDPstring
+        gpsdata=NMEAstring
     if len(str(gpsdata))>8:
         header = gpsdata[3:6] # slicing out the header information (3 letters needed)
         UDPupdate=UDPupdatedef # resetting the UDP timer to default value
@@ -911,17 +964,18 @@ def GPSread():
     #print(header)
     if header=="RMC": # the line containing the needed information like position, time and speed etc....
         RMCarray=gpsdata.split(",") #make array according to comma-separation in string
-        GPSUTC=(RMCarray [1])
+        UTC=(RMCarray [1])
         GPSdate=(RMCarray [9])
         try:
-            SOG=(float(RMCarray [7])) # knots
+            SOG=float(RMCarray [7]) # knots
         except:
             SOG=0
+            print("SOG error")
 #        SOG='{:3.1f}'.format(float(RMCarray [7])) #str(SOG)
-        if SOG>SOGmax:
-            SOGmax=SOG
+        #if SOG>SOGmax:
+        #    SOGmax=SOG
         if RMCarray [8]!="":
-            COG=(float(RMCarray [8]))
+            COG=float(RMCarray [8])
         else:
             COG=0
         latdegminmin=(RMCarray [3])
@@ -932,11 +986,11 @@ def GPSread():
         lonnow=dmm2dec(londegminmin,GPSEW) #current longitude converted to decimal format
         latnowdms=dec2dms(float(latnow)) #current position converted to dms format
         lonnowdms=dec2dms(float(lonnow))
-        UTZhours=TIMEZ+float(GPSUTC[0:2])
+        UTZhours=TIMEZ+float(UTC[0:2])
         if UTZhours>23:
             UTZhours=UTZhours-24
         UTZhours=int(UTZhours)
-        UTZ=str(UTZhours).zfill(2)+str(GPSUTC)[2:4]
+        UTZ=str(UTZhours).zfill(2)+str(UTC)[2:4]
         
         monthname=calendar.month_abbr[int((GPSdate)[2:4])]
         daynames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -945,7 +999,7 @@ def GPSread():
 
             #Check system clocks:   timedatectl status           
             #Format example: sudo date --set="2015-09-30 10:05:59"            
-#            UTCOS = "20" + str(GPSdate)[4:] + "-" + str(GPSdate)[2:4] + "-" + str(GPSdate)[0:2] + " " + str(UTZ)[0:2] + ":" + str(GPSUTC)[2:4] + ":" + str(GPSUTC)[4:6] #Local time formatted to use for OS clock
+#            UTCOS = "20" + str(GPSdate)[4:] + "-" + str(GPSdate)[2:4] + "-" + str(GPSdate)[0:2] + " " + str(UTZ)[0:2] + ":" + str(UTC)[2:4] + ":" + str(UTC)[4:6] #Local time formatted to use for OS clock
 #            subprocess.Popen(["sudo", "date", "-s", UTCOS])
 #            os.system("sudo date -s " % str(UTCOS))
             # subprocess('sudo time --set' % UTCOS)
@@ -954,9 +1008,10 @@ def GPSread():
 #            os.system('sudo hwclock --systohc') #Set hardware clock
 
 def UDPread():
-    global UDPstring,tempin,tempout,temp18B20,pressure,humidity,UDPaddress,TWSmax,SOGmax
-    global DEP,TWS,TWD,TWA,TSE,STW,AWA,AWS #Seatalk1
+    global NMEAstring,tempin,tempout,tempENGINE,pressure,humidity,UDPaddress,TWSmax,SOGmax,MAG
+    global DEP,TWS,TWD,TSE,STW,AWA,AWS,AUT #Seatalk1
     global VOL1,VOL2,VOL3
+    global AUT,AUTSET,AUTSETCOUNT,AUTON,AUTONCOUNT # Autopilot values
 
     while True:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
@@ -964,73 +1019,119 @@ def UDPread():
         sock.bind((UDP_IP, UDP_PORT))
         data, addr = sock.recvfrom(1024) # buffer size is 1024 bytes
         UDPaddress=addr[0]
-        UDPstring = str(data)[2:] 
-        header = UDPstring[3:6] # slicing out the header information (3 letters needed)
+        NMEAstring = str(data)[2:] 
+        try:
+            but_udp.text=NMEAstring
+        except:
+            print("error? but_udp.text=NMEAstring ")
+        header = NMEAstring[3:6] # slicing out the header information (3 letters needed to identify string)
         #if header=="RMC":
-        #    print(UDPstring)  
+        #    print(NMEAstring)  
         if header=="WEA":
-            WEAarray=UDPstring.split(",") #make array according to comma-separation in string
+            WEAarray=NMEAstring.split(",") #make array according to comma-separation in string
             #print(WEAarray)
             #print(UDPaddress)  
-            tempin=(WEAarray [1])
-            tempout=(WEAarray [2])
-            pressure=(WEAarray [3])
-            humidity=(WEAarray [4])
-            temp18B20=(WEAarray [5])
+            try:
+                tempin='{:3.1f}'.format(float(WEAarray[1]))
+                tempout='{:3.1f}'.format(float(WEAarray[2]))
+                pressure='{:3.0f}'.format(float(WEAarray[3]))
+                humidity='{:2.0f}'.format(float(WEAarray[4]))
+                tempENGINE='{:2.0f}'.format(float(WEAarray[5]))
+            except:
+                print("WEA read problem")
         if header=="DBT":
-            DBTarray=UDPstring.split(",") #DBT - Depth Below Transducer
-            DEP='{:3.1f}'.format(float(DBTarray[3]))
+            DBTarray=NMEAstring.split(",") #DBT - Depth Below Transducer
+            try:
+                DEP='{:3.1f}'.format(float(DBTarray[3]))
+            except:
+                DEP=DBTarray[3]
 #        if header=="MWV":
-#           MWVarray=UDPstring.split(",") #make array according to comma-separation in string
+#           MWVarray=NMEAstring.split(",") #make array according to comma-separation in string
         if header=="VOL":
-            VOLarray=UDPstring.split(",") #VOL - Voltage inputs
-            VOL1='{:3.1f}'.format(float(VOLarray[1]))
-            VOL2='{:3.1f}'.format(float(VOLarray[2]))
-            VOL3='{:3.1f}'.format(float(VOLarray[3]))
-
+            VOLarray=NMEAstring.split(",") #VOL - Voltage inputs
+            try:
+                VOL1='{:3.1f}'.format(float(VOLarray[1]))
+                VOL2='{:3.1f}'.format(float(VOLarray[2]))
+                VOL3='{:3.1f}'.format(float(VOLarray[3]))
+            except:
+                VOL1=VOLarray[1]
+                VOL2=VOLarray[2]
+                VOL3=VOLarray[3]
+                
         if header=="VWR":
-            VWRarray=UDPstring.split(",") #VWR - Relative Wind Speed and Angle
-            AWA=float(VWRarray[1]) # Wind angle to bow magnitude in degrees
-            AWB=VWRarray[2] # Wind direction Left/Right of bow
+            VWRarray=NMEAstring.split(",") #VWR - Relative Wind Speed and Angle
+            try:
+                AWA=float(VWRarray[1]) # Wind angle to bow magnitude in degrees
+                AWB=VWRarray[2] # Wind direction Left/Right of bow
+            except:
+                AWA=1
+                AWB="R"
+                print("AWA/AWB error")
             if AWB=="R":
                 AWA=AWA
             else:
                 AWA=-AWA
-            #AWA='{:3.1f}'.format(AWA)
-            AWS=float(VWRarray[3])*0.514444 # Apparent wind speed (knots) changed to Meters Per Second
-            if AWS<0.1:
-                AWS=0.1
+            try:
+                if windknots==True:
+                    AWS=float(VWRarray[3])*0.514444 # Apparent wind speed (knots) converted to Meters Per Second
+                else:
+                    AWS=float(VWRarray[3])
+                if AWS<1: # Avoid zeros
+                    AWS=1
+            except:
+                print("could not read AWS from VWR string")
             #Calculating True wind
             AWA_rad=math.radians(AWA) # convert angle deg to radians
-            if AWA_rad==0: # Avoid cos(0)
+            if AWA_rad<0.1: # Avoid cos(0)
                 AWA_rad=0.1
             SOGms=SOG*0.514444 #Speed over ground in m/s
-            TWS=math.sqrt(math.pow(AWS,2)+math.pow(SOGms,2)-2*AWS*SOGms*math.cos(AWA_rad)) # True wind speed
-            if TWS>TWSmax:
-                TWSmax=TWS
+            try:
+                TWS=math.sqrt(math.pow(AWS,2)+math.pow(SOGms,2)-2*AWS*SOGms*math.cos(AWA_rad)) # True wind speed
+            except:
+                TWS=1
+                print("TWS errror")
+            #if TWS>TWSmax:
+            #    TWSmax=TWS
             if TWS<0.1: #Avoid 0 division 
                 TWS=0.1
-            if AWB=="R":
-                TWA=math.degrees(math.acos((AWS*math.cos(AWA_rad)-SOGms)/TWS)) # True wind direction (compass)
-            else:
-                TWA=math.degrees(-math.acos((AWS*math.cos(AWA_rad)-SOGms)/TWS))
-            TWD=TWA
-#            TWD=COG+TWA
+            try:
+                if AWB=="R":
+                    TWD=math.degrees(math.acos((AWS*math.cos(AWA_rad)-SOGms)/TWS)) # True wind direction (compass)
+                else:
+                    TWD=math.degrees(-math.acos((AWS*math.cos(AWA_rad)-SOGms)/TWS))
+            except ValueError:
+                TWD=1
+#            TWD=COG+TWD
             if TWD<0:
                 TWD=360+TWD
             if TWD>=360:
                 TWD=TWD-360
-            #print("AWA_rad "+str(AWA_rad))            
-            #print("AWA "+str(AWA))            
-            #print("TWA "+str(TWA))            
-            #print("TWD "+str(TWD))
         if header=="MTW":
-            MTWarray=UDPstring.split(",") #MTW - Mean Temperature of Water
-            TSE=MTWarray[1] #Sea temp
-        if header=="VHW":
-            VHWarray=UDPstring.split(",") #make array according to comma-separation in string
-            STW=(VHWarray[3])
-
+            MTWarray=NMEAstring.split(",") #MTW - Mean Temperature of Water
+            try:
+                TSE=MTWarray[1] #Sea temp
+            except:
+                print("No TSE in array")
+        if header=="VHW": #VHW - Water speed and heading
+            VHWarray=NMEAstring.split(",") #make array according to comma-separation in string
+            MAG=VHWarray[3] # Magnetic compass heading
+            try:
+                STW=float(VHWarray[5])
+            except ValueError:
+                STW=0
+        if header=="HDM": # HDM="$IIHDM,222.,M" # Heading - Magnetic - Auto pilot. Only broadcasted if turned on.
+            HDMarray=NMEAstring.split(",")
+            AUTON=True
+            AUTONCOUNT=10
+        if header=="HSC": # HSC="$IIHSC,,,333.,M" # Heading Steering Command. Auto pilot heading. Only broadcasted in AUTO mode.
+            AUTSET=True
+            AUTSETCOUNT=10
+            HSCarray=NMEAstring.split(",")
+            AUT=HSCarray[3]
+        if header=="MAX": # Max values
+            MAXarray=NMEAstring.split(",")
+            TWSmax=MAXarray[1]
+            SOGmax=MAXarray[2]
 def wpt_nav(wpt_mode):
     # Show Waypoint selector when WPT button is clicked in Navigation menu
     global wptindex,wpts,wptlist,wptscsv,dest,list_wpts,wpts_text_index,latdesdms,latNS,londesdms,lonEW
@@ -1115,7 +1216,7 @@ def MOB():
     single_show("MOBnow")
     
 def trip_start():
-    global tripcount,triptime,latint,lonint,latnow,lonnow,latdep,londep,triplog,but_trip_00,but_trip_10,tripdistance,latsec,lonsec,tripsecelapsed,tripstart,navlog
+    global tripcount,triptime,latint,lonint,latnow,lonnow,latdep,londep,triplog,but_dep_00,but_dep_10,tripdistance,latsec,lonsec,tripsecelapsed,tripstart,navlog
     #Start trip
     triptime=0
     tripcount=0
@@ -1129,20 +1230,20 @@ def trip_start():
     londep=lonnow
     tripstart=str(datetime.now())
     triplog=True
-    but_trip_start.disable()
-    but_trip_start.text_color="red"
-    but_trip_stop.enable()
+    but_dep_start.disable()
+    but_dep_start.text_color="red"
+    but_dep_stop.enable()
     log_create()
     
 def trip_stop():
-    global tripdistance,tripcount,triptime,latint,lonint,latnow,lonnow,but_trip_00,but_trip_10,triplog
+    global tripdistance,tripcount,triptime,latint,lonint,latnow,lonnow,but_dep_00,but_dep_10,triplog
 
     #Stop trip
     triplog=False
-    but_trip_start.enable()
-    but_trip_start.text_color=colorfor
-    but_trip_stop.disable()
-#    but_trip_stop = PushButton(window_trip, command=trip_start, text="START", width=but_width, height=but_height, grid=[0,1])
+    but_dep_start.enable()
+    but_dep_start.text_color=colorfor
+    but_dep_stop.disable()
+#    but_dep_stop = PushButton(window_dep, command=trip_start, text="START", width=but_width, height=but_height, grid=[0,1])
 
 def wptscroll(y): #Control scrolling in waypoint list box with up+down buttons
     global wptindex, wpts, wptlist, wptscrolling
@@ -1260,20 +1361,20 @@ def AVSreset():
 def log_create():
     global logname
     #Creating new file after GPS time is received and inserting header
-    log_header = ["Date","UTC","UTZ", "SOG","SOGmax","COG","tripdistance","triptime(min)","latdep","londep","Latitude","Longitude","latdes","londes","destination","tempin","tempout","humidity","HPa","AWA","AWS","TWD","TWS","TWSmax","BRG","DTW","Depth","SEA"]
+    log_header = ["Date","UTC","UTZ", "SOG","SOGmax","STW","COG","tripdistance","triptime(min)","latdep","londep","Latitude","Longitude","latdes","londes","destination","tempin","tempout","humidity","HPa","AWA","AWS","TWD","TWS","TWSmax","BRG","DTW","Depth","SEA"]
     if OSplatform=="Linux":
         logname='/home/pi/' + str(GPSdate) + "-" + str(UTZ) + '.csv'
     else:
-        logname='C:\\Users\\bonde\\Dropbox\\Code\\Python\\MAIA\\' + str(daynumber) + "-" + str(UTZ) + '.csv' 
+        logname='C:\\Users\\bonde\\Dropbox\\Code\\Python\\MAIA\\' +  "-" + str(UTZ) + '.csv' 
     with open(logname,"w") as f:
         f.write(",".join(str(value) for value in log_header)+ "\n")
-#    print ("New log created: " + str(logname))
+    print ("New log created: " + str(logname))
 
 def log_update(): # save data to logfile
     #global tempin,tempout,pressure,humidity
     logtripdis= '{:4.1f}'.format(tripdistance)
     logtriptime= triptime/60
-    log_data = [GPSdate,GPSUTC,UTZ, SOG,SOGmax,COG,logtripdis,logtriptime,latdep,londep,latnow,lonnow,latdes,londes,dest,tempin,tempout,humidity,pressure,AWA,AWS,TWD,TWS,TWSmax,BRG,DTW,DEP,TSE]
+    log_data = [GPSdate,UTC,UTZ, SOG,SOGmax,STW,COG,logtripdis,logtriptime,latdep,londep,latnow,lonnow,latdes,londes,dest,tempin,tempout,humidity,pressure,AWA,AWS,TWD,TWS,TWSmax,BRG,DTW,DEP,TSE]
     with open(logname,"a") as f:
         f.write(",".join(str(value) for value in log_data)+ "\n")
 
@@ -1322,12 +1423,197 @@ def setload():
     except:
         print("no settings file ")
 
+# **************** Hardware detect ***************************
+
+def getSerial():
+  # Extract serial from cpuinfo file
+  mycpuserial = "Error"
+  try:
+    f = open('/proc/cpuinfo','r')
+    for line in f:
+      if line[0:6]=='Serial':
+        mycpuserial = line[10:26]
+    f.close()
+  except:
+    mycpuserial = "Error"
+
+  return mycpuserial
+
+def getRevision():
+  # Extract board revision from cpuinfo file
+  myrevision = "Error"
+  try:
+    f = open('/proc/cpuinfo','r')
+    for line in f:
+      if line[0:8]=='Revision':
+        myrevision = line[11:-1]
+    f.close()
+  except:
+    myrevision = "Error"
+
+  return myrevision
+
+def getModel():
+  # Extract Pi Model string
+  try:
+    mymodel = open('/proc/device-tree/model').readline()
+  except:
+    mymodel = "Error"
+
+  return mymodel
+
+def getEthName():
+  # Get name of Ethernet interface
+  try:
+    for root,dirs,files in os.walk('/sys/class/net'):
+      for dir in dirs:
+        if dir[:3]=='enx' or dir[:3]=='eth':
+          interface=dir
+  except:
+    interface="None"
+  return interface
+  
+def getMAC(interface='eth0'):
+  # Return the MAC address of named Ethernet interface
+  try:
+    line = open('/sys/class/net/%s/address' %interface).read()
+  except:
+    line = "None"
+  return line[0:17]
+  
+def getIP(interface='eth0'):
+  # Read ifconfig.txt and extract IP address
+  try:
+    filename = 'ifconfig_' + interface + '.txt'
+    os.system('ifconfig ' + interface + ' > /home/pi/' + filename)
+    f = open('/home/pi/' + filename, 'r')
+    line = f.readline() # skip 1st line
+    line = f.readline() # read 2nd line
+    line = line.strip()
+    f.close()
+
+    if line.startswith('inet '):
+      a,b,c = line.partition('inet ')
+      a,b,c = c.partition(' ')
+      a=a.replace('addr:','')
+    else:
+      a = 'None'
+
+    return a
+
+  except:
+    return 'Error'
+
+def getCPUtemp():
+  # Extract CPU temp
+  try:
+    temp = subprocess.check_output(['vcgencmd','measure_temp'])
+    temp = temp[5:-3]
+  except:
+    temp = '0.0'
+  temp = '{0:.2f}'.format(float(temp))
+  return str(temp)
+
+def getGPUtemp():
+  # Extract GPU temp
+  try:
+    temp = subprocess.check_output(['cat','/sys/class/thermal/thermal_zone0/temp'])
+    temp = float(temp)/1000
+  except:
+    temp = 0.0
+  temp = '{0:.2f}'.format(temp)
+  return temp
+
+def getRAM():
+  # free -m
+  output = subprocess.check_output(['free','-m'])
+  lines = output.splitlines()
+  line  = str(lines[1])
+  ram = line.split()
+  # total/free  
+  return (ram[1],ram[3])
+
+def getDisk():
+  # df -h
+  output = subprocess.check_output(['df','-h'])
+  lines = output.splitlines()
+  line  = str(lines[1])
+  disk  = line.split()
+  # total/free
+  return (disk[1],disk[3])
+
+def getCPUspeed():
+  # Get CPU frequency
+  try:
+    output = subprocess.check_output(['vcgencmd','get_config','arm_freq'])
+    lines = output.splitlines()
+    line  = lines[0]
+    freq = line.split('=')
+    freq = freq[1]
+  except:
+    freq = '0'
+  return freq
+
+def getUptime():
+  # uptime
+  # tupple uptime, 5 min load average
+  return 0
+
+def getPython():
+  # Get current Python version
+  # returns string
+  pythonv = platform.python_version()
+  return pythonv
+
+def getSPI():
+  # Check if SPI bus is enabled
+  # by checking for spi_bcm2### modules
+  # returns a string
+  spi = "False"
+  try:
+    c=subprocess.Popen("lsmod",stdout=subprocess.PIPE)
+    gr=subprocess.Popen(["grep" ,"spi_bcm2"],stdin=c.stdout,stdout=subprocess.PIPE)
+    output = gr.communicate()[0]
+    if output[:8]=='spi_bcm2':
+      spi = "True"
+  except:
+    pass
+  return spi
+
+def getI2C():
+  # Check if I2C bus is enabled
+  # by checking for i2c_bcm2### modules
+  # returns a string
+  i2c = "False"
+  try:
+    c=subprocess.Popen("lsmod",stdout=subprocess.PIPE)
+    gr=subprocess.Popen(["grep" ,"i2c_bcm2"],stdin=c.stdout,stdout=subprocess.PIPE)
+    output = gr.communicate()[0]
+    if output[:8]=='i2c_bcm2':
+      i2c = "True"
+  except:
+    pass
+  return i2c
+
+def getBT():
+  # Check if Bluetooth module is enabled
+  # returns a string
+  bt = "False"
+  try:
+    c=subprocess.Popen("lsmod",stdout=subprocess.PIPE)
+    gr=subprocess.Popen(["grep" ,"bluetooth"],stdin=c.stdout,stdout=subprocess.PIPE)
+    output = gr.communicate()[0]
+    if output[:9]=='bluetooth':
+      bt = "True"
+  except:
+    pass
+  return bt
 
 # ********************************  Exiting ***************************************
 
 def quitting():
-    if gpioimport==True:
-        GPIO.cleanup()
+#    if gpioimport==True:
+    GPIO.cleanup()
     window_system.hide()
     app.destroy()
 
@@ -1350,40 +1636,42 @@ def menu_status_hard():
     status_list_column.append("res " + str(screen_width) + "x" + str(screen_height))
     if OSplatform=="Linux": 
         try:
-
-            status_list_column.append(mypi.getModel()[:15])
-            status_list_column.append(mypi.getModel()[15:])
+            status_list_column.append(getModel()[:15])
+            status_list_column.append(getModel()[15:])
         except:
             status_list_column.append("model failed")            
-        status_list_column.append(mypi.platform.platform()[:15])
-        status_list_column.append(mypi.platform.platform()[15:30])
-        status_list_column.append(mypi.platform.platform()[30:])
-        status_list_column.append("rev " + mypi.getRevision())
-        status_list_column.append("ser" + mypi.getSerial()[:10])
-        status_list_column.append("" + mypi.getSerial()[10:])
-        status_list_column.append("python " + mypi.platform.python_version())
+        try:
+            status_list_column.append(platform.platform()[:15])
+            status_list_column.append(platform.platform()[15:30])
+            status_list_column.append(platform.platform()[30:])
+        except:
+            status_list_column.append("platform failed")            
+        status_list_column.append("rev " + getRevision())
+        status_list_column.append("ser" + getSerial()[:10])
+        status_list_column.append("" + getSerial()[10:])
+        status_list_column.append("python " + platform.python_version())
 
         status_list_column=status_list_center
         status_list_column.clear()
-        status_list_column.append("SPI " + mypi.getSPI())
-        status_list_column.append("I2C " + mypi.getI2C())
+        status_list_column.append("SPI " + getSPI())
+        status_list_column.append("I2C " + getI2C())
         status_list_column.append("NETWORK ")
-        status_list_column.append("Bluetooth " + mypi.getBT())
-        status_list_column.append("LAN " + mypi.getEthName())
-        status_list_column.append("" + mypi.getMAC())
-        status_list_column.append("ip " + mypi.getIP())
+        status_list_column.append("Bluetooth " + getBT())
+        status_list_column.append("LAN " + getEthName())
+        status_list_column.append("" + getMAC())
+        status_list_column.append("ip " + getIP())
         status_list_column.append("WiFi:")
-        status_list_column.append("" + mypi.getMAC('wlan0'))
-        status_list_column.append("ip " + mypi.getIP('wlan0'))
+        status_list_column.append("" + getMAC('wlan0'))
+        status_list_column.append("ip " + getIP('wlan0'))
 
         status_list_column=status_list_right 
         status_list_column.clear()
-        status_list_column.append("CPUt " + mypi.getCPUtemp())
-        status_list_column.append("GPUt " + mypi.getGPUtemp())
-        status_list_column.append("ram" + str(mypi.getRAM()))
-        status_list_column.append("dsk" + str(mypi.getDisk()))
-        status_list_column.append("CPUspeed " + mypi.getCPUspeed())
-        status_list_column.append("uptime " + str(mypi.getUptime()))
+        status_list_column.append("CPUt " + getCPUtemp())
+        status_list_column.append("GPUt " + getGPUtemp())
+        status_list_column.append("ram" + str(getRAM()))
+        status_list_column.append("dsk" + str(getDisk()))
+        status_list_column.append("CPUspeed " + getCPUspeed())
+        status_list_column.append("uptime " + str(getUptime()))
     window_status.text_size=but_text_size-16
     window_status.show()
 
@@ -1397,7 +1685,7 @@ def menu_status_soft():
     status_list_column.append("Speed " + str(SOG))
     status_list_column.append("Course " + str(COG))
     status_list_column.append("Date " + str(GPSdate))
-    status_list_column.append("UTC " + str(GPSUTC)[0:6])
+    status_list_column.append("UTC " + str(UTC)[0:6])
     status_list_column.append("Zone " + str(TIMEZ))
     status_list_column.append("UTZ " + str(UTZ)[0:4])
     status_list_column.append("latgps " + str(latdegminmin))
@@ -1460,7 +1748,7 @@ but_width=int(screen_width/95)
 if screen_height<=1000:
     but_height=int(screen_height/100)
 if screen_height>1000:
-    but_height=int(screen_height/130)
+    but_height=int(screen_height/150)
 #if screen_width>780: 
 #    but_width=8
 RES=str(screen_width) + " x " + str(screen_height)
@@ -1472,6 +1760,13 @@ window_single.tk.attributes("-fullscreen", True)
 but_single = PushButton(window_single, command=single_hide, text=str(mode), width="fill", height="fill")
 but_single.text_size=but_text_bigsize
 window_single.hide()
+
+# UDP data menu
+window_udp = Window(app, title="UDP")
+window_udp.tk.attributes("-fullscreen", True)
+but_udp = PushButton(window_udp, command=window_udp.hide, text=str(mode), width="fill", height="fill")
+but_udp.text_size=int(but_text_size/2)
+window_udp.hide()
 
 # Yes/No menu
 window_ynmenu = Window(app, title="ynmenu")
@@ -1689,7 +1984,7 @@ window_system.text_size=but_text_size
 window_system.hide()
 but_system_00 = PushButton(window_system, command=menu_status_hard, text="HW", width=but_width, height=but_height, grid=[0,0])
 but_system_10 = PushButton(window_system, command=menu_status_soft, text="SW", width=but_width, height=but_height, grid=[1,0])
-but_system_20 = PushButton(window_system, text=" ", width=but_width+1, height=but_height, grid=[2,0])
+but_system_20 = PushButton(window_system, command=window_udp.show, text="UDP", width=but_width+1, height=but_height, grid=[2,0])
 but_system_01 = PushButton(window_system, command=ynmenu, args=["quit"], text="QUIT", width=but_width, height=but_height, grid=[0,1])
 but_system_11 = PushButton(window_system, command=ynmenu, args=["reboot"], text="REBOOT", width=but_width, height=but_height, grid=[1,1])
 but_system_21 = PushButton(window_system, command=window_system.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
@@ -1708,16 +2003,16 @@ but_utz_plus = PushButton(box_utz_sel, lambda:UTZ_set(1), text="+", width=but_wi
 but_utz_hide = PushButton(box_utz_sel, command=window_utz.hide, text="◄", width=but_width+1, height=but_height, align="left")
 
 # Time and timers
-window_racecountdown = Window(app, title="Countdown", layout="grid")
-window_racecountdown.tk.attributes("-fullscreen", True)
-window_racecountdown.text_size=but_text_size
-window_racecountdown.hide()
-but_racecountdown_00 = PushButton(window_racecountdown, command=downcounter, args=["05"], text="05", width=but_width, height=but_height, grid=[0,0])
-but_racecountdown_10 = PushButton(window_racecountdown, command=downcounter, args=["10"], text="10", width=but_width, height=but_height, grid=[1,0])
-but_racecountdown_20 = PushButton(window_racecountdown, command=downcounter, args=["man"], text="man", width=but_width+1, height=but_height, grid=[2,0])
-but_racecountdown_01 = PushButton(window_racecountdown, command=downcounter, args=["12"], text="12", width=but_width, height=but_height, grid=[0,1])
-but_racecountdown_11 = PushButton(window_racecountdown, command=downcounter, args=["15"], text="15", width=but_width, height=but_height, grid=[1,1])
-but_racecountdown_21 = PushButton(window_racecountdown, command=window_racecountdown.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+window_countdown = Window(app, title="Countdown", layout="grid")
+window_countdown.tk.attributes("-fullscreen", True)
+window_countdown.text_size=but_text_size
+window_countdown.hide()
+but_countdown_00 = PushButton(window_countdown, command=downcounter, args=["05"], text="05", width=but_width, height=but_height, grid=[0,0])
+but_countdown_10 = PushButton(window_countdown, command=downcounter, args=["10"], text="10", width=but_width, height=but_height, grid=[1,0])
+but_countdown_20 = PushButton(window_countdown, command=downcounter, args=["man"], text="man", width=but_width+1, height=but_height, grid=[2,0])
+but_countdown_01 = PushButton(window_countdown, command=downcounter, args=["12"], text="12", width=but_width, height=but_height, grid=[0,1])
+but_countdown_11 = PushButton(window_countdown, command=downcounter, args=["15"], text="15", width=but_width, height=but_height, grid=[1,1])
+but_countdown_21 = PushButton(window_countdown, command=window_countdown.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
 
 window_timer = Window(app, title="Timers", layout="grid")
 window_timer.tk.attributes("-fullscreen", True)
@@ -1726,26 +2021,15 @@ window_timer.hide()
 but_timer_00 = PushButton(window_timer, lambda:single_show("time"), text="Time", width=but_width, height=but_height, grid=[0,0])
 but_timer_10 = PushButton(window_timer, lambda:single_show("date"), text="Date", width=but_width, height=but_height, grid=[1,0])
 but_timer_20 = PushButton(window_timer, command=racing, text="Race", width=but_width+1, height=but_height, grid=[2,0])
-but_timer_01 = PushButton(window_timer, command=window_racecountdown.show, text="Count", width=but_width, height=but_height, grid=[0,1])
+but_timer_01 = PushButton(window_timer, command=window_countdown.show, text="Count", width=but_width, height=but_height, grid=[0,1])
 but_timer_11 = PushButton(window_timer, lambda:single_show("stop"), text="Stop", width=but_width, height=but_height, grid=[1,1])
 but_timer_21 = PushButton(window_timer, command=window_timer.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
 
-# Weather Station
-window_met = Window(app, title="Meterologics", layout="grid")
-window_met.tk.attributes("-fullscreen", True)
-window_met.text_size=but_text_size
-window_met.hide()
-but_met_00 = PushButton(window_met, lambda:single_show("tIN"), text="tIN", width=but_width, height=but_height, grid=[0,0])
-but_met_10 = PushButton(window_met, lambda:single_show("tOUT"), text="tOUT", width=but_width, height=but_height, grid=[1,0])
-but_met_20 = PushButton(window_met, lambda:single_show("t18B20"), text="t18B20", width=but_width+1, height=but_height, grid=[2,0]) 
-but_met_01 = PushButton(window_met, lambda:single_show("hPa"), text="hPa", width=but_width, height=but_height, grid=[0,1])
-but_met_11 = PushButton(window_met, lambda:single_show("HUM"), text="HUM", width=but_width, height=but_height, grid=[1,1])
-but_met_21 = PushButton(window_met, command=window_met.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
 '''
-window_met_graph = Window(app, title="Meterologic graphs")
-window_met_graph.tk.attributes("-fullscreen", True)
-window_met_graph.hide()
-but_met=PushButton(window_met_graph, command=window_met_graph.hide, image=metpng)
+window_wea_graph = Window(app, title="Meterologic graphs")
+window_wea_graph.tk.attributes("-fullscreen", True)
+window_wea_graph.hide()
+but_wea=PushButton(window_wea_graph, command=window_wea_graph.hide, image=metpng)
 '''
 # 4x3 Menu for settings
 window_settings = Window(app, title="settings", layout="grid")
@@ -1780,9 +2064,9 @@ window_service.text_size=but_text_size
 window_service.hide()
 but_service_00 = PushButton(window_service, command=window_system.show, text="SYS", width=but_width, height=but_height, grid=[0,0])
 but_service_10 = PushButton(window_service, command=window_settings.show, text="SET", width=but_width, height=but_height, grid=[1,0])
-but_service_20 = PushButton(window_service, command=window_key.show, text="KEY", width=but_width+1, height=but_height, grid=[2,0])
+but_service_20 = PushButton(window_service, text=" ", width=but_width+1, height=but_height, grid=[2,0])
 but_service_01 = PushButton(window_service, command=window_timer.show, text="TIME", width=but_width, height=but_height, grid=[0,1])
-but_service_11 = PushButton(window_service, command=window_met.show, text="WEA", width=but_width, height=but_height, grid=[1,1])
+but_service_11 = PushButton(window_service, lambda:single_show("ALLDATA"), text="ALL", width=but_width, height=but_height, grid=[1,1])
 but_service_21 = PushButton(window_service, command=window_service.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
 #if BMP280import==False:
  #   but_service_11.text_color="red"
@@ -1807,40 +2091,89 @@ but_wpts_edit = PushButton(box_wpts_buts, command=wpt_edit, text=" ", width=but_
 but_wpts = PushButton(box_wpts_buts, command=window_wpts.hide, text="◄", width=but_width, height=but_height,align="top")
 
 # Navigate and select destination
-window_nav = Window(app, title="Navigation", layout="grid")
-window_nav.tk.attributes("-fullscreen", True)
-window_nav.text_size=but_text_size
-window_nav.hide()
-but_nav_00 = PushButton(window_nav, lambda:wpt_nav("nav"), text="WPT", width=but_width, height=but_height, grid=[0,0])
-but_nav_10 = PushButton(window_nav, lambda:single_show("DTW"), text="DTW", width=but_width, height=but_height, grid=[1,0])
-but_nav_20 = PushButton(window_nav, lambda:single_show("navbear"), text="BRG", width=but_width+1, height=but_height, grid=[2,0])
-but_nav_01 = PushButton(window_nav, lambda:single_show("navttg"), text="TTG", width=but_width, height=but_height, grid=[0,1])
-but_nav_11 = PushButton(window_nav, lambda:single_show("naveta"), text="ETA", width=but_width, height=but_height, grid=[1,1])
-but_nav_21 = PushButton(window_nav, command=window_nav.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+window_des = Window(app, title="Navigation", layout="grid")
+window_des.tk.attributes("-fullscreen", True)
+window_des.text_size=but_text_size
+window_des.hide()
+but_des_00 = PushButton(window_des, lambda:wpt_nav("nav"), text="WPT", width=but_width, height=but_height, grid=[0,0])
+but_des_10 = PushButton(window_des, lambda:single_show("DTW"), text="DTW", width=but_width, height=but_height, grid=[1,0])
+but_des_20 = PushButton(window_des, lambda:single_show("navbear"), text="BRG", width=but_width+1, height=but_height, grid=[2,0])
+but_des_01 = PushButton(window_des, lambda:single_show("navttg"), text="TTG", width=but_width, height=but_height, grid=[0,1])
+but_des_11 = PushButton(window_des, lambda:single_show("naveta"), text="ETA", width=but_width, height=but_height, grid=[1,1])
+but_des_21 = PushButton(window_des, command=window_des.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
 
 # Trip function
-window_trip = Window(app, title="Trip control", layout="grid")
-window_trip.tk.attributes("-fullscreen", True)
-window_trip.text_size=but_text_size
-window_trip.hide()
-but_trip_00 = PushButton(window_trip, lambda:single_show("tripdist"), text="DIS", width=but_width, height=but_height, grid=[0,0])
-but_trip_10 = PushButton(window_trip, lambda:single_show("triptime"), text="TIME", width=but_width, height=but_height, grid=[1,0])
-but_trip_20 = PushButton(window_trip, lambda:single_show("tripaver"), text="AVS", width=but_width+1, height=but_height, grid=[2,0])
-but_trip_start = PushButton(window_trip, command=trip_start, text="START", width=but_width, height=but_height, grid=[0,1])
-but_trip_stop = PushButton(window_trip, command=trip_stop, text="STOP", width=but_width, height=but_height, grid=[1,1], enabled=False)
-but_trip_21 = PushButton(window_trip, command=window_trip.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+window_dep = Window(app, title="Trip control", layout="grid")
+window_dep.tk.attributes("-fullscreen", True)
+window_dep.text_size=but_text_size
+window_dep.hide()
+but_dep_00 = PushButton(window_dep, lambda:single_show("tripdist"), text="DIS", width=but_width, height=but_height, grid=[0,0])
+but_dep_10 = PushButton(window_dep, lambda:single_show("triptime"), text="TIME", width=but_width, height=but_height, grid=[1,0])
+but_dep_20 = PushButton(window_dep, lambda:single_show("tripaver"), text="AVS", width=but_width+1, height=but_height, grid=[2,0])
+but_dep_start = PushButton(window_dep, command=trip_start, text="START", width=but_width, height=but_height, grid=[0,1])
+but_dep_stop = PushButton(window_dep, command=trip_stop, text="STOP", width=but_width, height=but_height, grid=[1,1], enabled=False)
+but_dep_21 = PushButton(window_dep, command=window_dep.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
 
-# Seatalk converted to NMEA
-window_ST1 = Window(app, title="ST1 control", layout="grid")
-window_ST1.tk.attributes("-fullscreen", True)
-window_ST1.text_size=but_text_size
-window_ST1.hide()
-but_ST1_00 = PushButton(window_ST1, lambda:single_show("DEP"), text="DPT", width=but_width, height=but_height, grid=[0,0])
-but_ST1_10 = PushButton(window_ST1, lambda:single_show("TWS"), text="TWS", width=but_width, height=but_height, grid=[1,0])
-but_ST1_20 = PushButton(window_ST1, lambda:single_show("TWD"), text="TWD", width=but_width+1, height=but_height, grid=[2,0])
-but_ST1_01 = PushButton(window_ST1, lambda:single_show("STW"), text="STW", width=but_width, height=but_height, grid=[0,1])
-but_ST1_11 = PushButton(window_ST1, lambda:single_show("TSE"), text="Tsea", width=but_width, height=but_height, grid=[1,1])
-but_ST1_21 = PushButton(window_ST1, window_ST1.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+# -------------   NOW  GROUP    -------------------
+# Engine
+window_eng = Window(app, title="Engine data", layout="grid")
+window_eng.tk.attributes("-fullscreen", True)
+window_eng.text_size=but_text_size
+window_eng.hide()
+but_eng_00 = PushButton(window_eng, lambda:single_show("tCO"), text="tCO", width=but_width, height=but_height, grid=[0,0])
+but_eng_10 = PushButton(window_eng, lambda:single_show("tENG"), text="tENG", width=but_width, height=but_height, grid=[1,0])
+but_eng_20 = PushButton(window_eng, lambda:single_show("tEXH"), text="tEXH", width=but_width+1, height=but_height, grid=[2,0]) 
+but_eng_01 = PushButton(window_eng, lambda:single_show("RPM"), text="RPM", width=but_width, height=but_height, grid=[1,1])
+but_eng_11 = PushButton(window_eng, lambda:single_show("HRS"), text="HRS", width=but_width, height=but_height, grid=[0,1])
+but_eng_21 = PushButton(window_eng, command=window_eng.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+
+# Levels
+window_lev = Window(app, title="Engine data", layout="grid")
+window_lev.tk.attributes("-fullscreen", True)
+window_lev.text_size=but_text_size
+window_lev.hide()
+but_lev_00 = PushButton(window_lev, lambda:single_show("VOL1"), text="CON", width=but_width, height=but_height, grid=[0,0])
+but_lev_10 = PushButton(window_lev, lambda:single_show("VOL2"), text="ENG", width=but_width, height=but_height, grid=[1,0])
+but_lev_20 = PushButton(window_lev, lambda:single_show("WLS"), text="WLS", width=but_width+1, height=but_height, grid=[2,0]) 
+but_lev_01 = PushButton(window_lev, lambda:single_show("FUE"), text="FUE", width=but_width, height=but_height, grid=[1,1])
+but_lev_11 = PushButton(window_lev, lambda:single_show("WAT"), text="WAT", width=but_width, height=but_height, grid=[0,1])
+but_lev_21 = PushButton(window_lev, command=window_lev.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+
+# Weather Station
+window_wea = Window(app, title="Meterologics", layout="grid")
+window_wea.tk.attributes("-fullscreen", True)
+window_wea.text_size=but_text_size
+window_wea.hide()
+but_wea_00 = PushButton(window_wea, lambda:single_show("tIN"), text="tIN", width=but_width, height=but_height, grid=[0,0])
+but_wea_10 = PushButton(window_wea, lambda:single_show("tOUT"), text="tOUT", width=but_width, height=but_height, grid=[1,0])
+but_wea_20 = PushButton(window_wea, lambda:single_show("TWS"), text="WIND", width=but_width+1, height=but_height, grid=[2,0]) 
+but_wea_01 = PushButton(window_wea, lambda:single_show("HUM"), text="HUM", width=but_width, height=but_height, grid=[1,1])
+but_wea_11 = PushButton(window_wea, lambda:single_show("hPa"), text="hPa", width=but_width, height=but_height, grid=[0,1])
+but_wea_21 = PushButton(window_wea, command=window_wea.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+
+# Seatalk1 converted to NMEA -- Secondary ST1 window
+window_ST1_2 = Window(app, title="ST1 control 2", layout="grid")
+window_ST1_2.tk.attributes("-fullscreen", True)
+window_ST1_2.text_size=but_text_size
+window_ST1_2.hide()
+but_ST1_2_00 = PushButton(window_ST1_2, lambda:single_show("TWSmax"), text="TWSmax", width=but_width, height=but_height, grid=[0,0])
+but_ST1_2_10 = PushButton(window_ST1_2, lambda:single_show("PILOT"), text="PILOT", width=but_width, height=but_height, grid=[1,0])
+but_ST1_2_20 = PushButton(window_ST1_2, text=" ", width=but_width+1, height=but_height, grid=[2,0])
+but_ST1_2_01 = PushButton(window_ST1_2, lambda:single_show("MAG"), text="COM", width=but_width, height=but_height, grid=[0,1])
+but_ST1_2_11 = PushButton(window_ST1_2, lambda:single_show("TSE"), text="SEA", width=but_width, height=but_height, grid=[1,1])
+but_ST1_2_21 = PushButton(window_ST1_2, window_ST1_2.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+
+# Seatalk1 converted to NMEA -- Main ST1 window
+window_ST1_1 = Window(app, title="ST1 control", layout="grid")
+window_ST1_1.tk.attributes("-fullscreen", True)
+window_ST1_1.text_size=but_text_size
+window_ST1_1.hide()
+but_ST1_1_00 = PushButton(window_ST1_1, lambda:single_show("STW"), text="STW", width=but_width, height=but_height, grid=[0,1])
+but_ST1_1_10 = PushButton(window_ST1_1, lambda:single_show("TWS"), text="TWS", width=but_width, height=but_height, grid=[1,0])
+but_ST1_1_20 = PushButton(window_ST1_1, lambda:single_show("TWD"), text="TWD", width=but_width+1, height=but_height, grid=[2,0])
+but_ST1_1_01 = PushButton(window_ST1_1, lambda:single_show("DEP"), text="DPT", width=but_width, height=but_height, grid=[0,0])
+but_ST1_1_11 = PushButton(window_ST1_1, command=window_ST1_2.show, text="MORE", width=but_width, height=but_height, grid=[1,1])
+but_ST1_1_21 = PushButton(window_ST1_1, window_ST1_1.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
 
 # GPS 
 window_GPS = Window(app, title="GPS control", layout="grid")
@@ -1851,16 +2184,29 @@ but_GPS_00 = PushButton(window_GPS, lambda:single_show("SOG"), text="SOG", width
 but_GPS_10 = PushButton(window_GPS, lambda:single_show("gpshead"), text="COG", width=but_width, height=but_height, grid=[1,0])
 but_GPS_20 = PushButton(window_GPS, lambda:single_show("gpspos"), text="POS", width=but_width+1, height=but_height, grid=[2,0])
 but_GPS_01 = PushButton(window_GPS, lambda:single_show("gpsall"), text="ALL", width=but_width, height=but_height, grid=[0,1])
-but_GPS_11 = PushButton(window_GPS, command=window_ST1.show, text="INS", width=but_width, height=but_height, grid=[1,1])
-#but_GPS_11 = PushButton(window_GPS, command=MOB, text="MOB", width=but_width, height=but_height, grid=[1,1])
+but_GPS_11 = PushButton(window_GPS, lambda:single_show("SOGmax"), text="MAX", width=but_width, height=but_height, grid=[1,1])
 but_GPS_21 = PushButton(window_GPS, window_GPS.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+
+# NOW menu
+window_now = Window(app, title="NOW data", layout="grid")
+window_now.tk.attributes("-fullscreen", True)
+window_now.text_size=but_text_size
+window_now.hide()
+but_now_00 = PushButton(window_now, command=window_GPS.show, text="GPS", width=but_width, height=but_height, grid=[0,0])
+but_now_10 = PushButton(window_now, command=window_wea.show, text="WEA", width=but_width, height=but_height, grid=[1,0])
+but_now_20 = PushButton(window_now, command=window_ST1_1.show, text="INS", width=but_width+1, height=but_height, grid=[2,0]) 
+but_now_01 = PushButton(window_now, command=window_lev.show, text="LEV", width=but_width, height=but_height, grid=[0,1])
+but_now_11 = PushButton(window_now, command=window_eng.show, text="ENG", width=but_width, height=but_height, grid=[1,1])
+but_now_21 = PushButton(window_now, command=window_now.hide, text="◄", width=but_width+1, height=but_height, grid=[2,1])
+
+# -----------   MAIN MENU   -------------------
 
 # App = Main Menu
 #app.text_size=but_text_size
 app.tk.attributes("-fullscreen", True)
-but_main_00 = PushButton(app, command=window_trip.show, text="DEP", width=but_width, height=but_height, grid=[0,0])
-but_main_10 = PushButton(app, command=window_GPS.show, text="NOW", width=but_width, height=but_height, grid=[1,0])
-but_main_20 = PushButton(app, command=window_nav.show, text="DES",  width=but_width+1, height=but_height, grid=[2,0])
+but_main_00 = PushButton(app, command=window_dep.show, text="DEP", width=but_width, height=but_height, grid=[0,0])
+but_main_10 = PushButton(app, command=window_now.show, text="NOW", width=but_width, height=but_height, grid=[1,0])
+but_main_20 = PushButton(app, command=window_des.show, text="DES",  width=but_width+1, height=but_height, grid=[2,0])
 but_main_01 = PushButton(app, command=dashboard, text="DASH", width=but_width, height=but_height, grid=[0,1])
 but_main_11 = PushButton(app, command=MOB, text="MOB", width=but_width, height=but_height, grid=[1,1])
 but_main_21 = PushButton(app, command=window_service.show, text="⦿", width=but_width+1, height=but_height, grid=[2,1])

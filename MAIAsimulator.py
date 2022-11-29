@@ -176,7 +176,7 @@ while True:
     # Create GPS position
     latprev=lat
     lonprev=lon
-    RMC="$GPRMC,"+timenow+",A," + str(latdms) +",N," + str(londms)+ ",E,"+str('{:3.1f}'.format(SOG))+","+str('{:3.1f}'.format(COG))+","+datenow
+    RMC="$GPRMC,"+timenow+",A," + str(latdms) +",N," + str(londms)+ ",E,"+str('{:3.1f}'.format(SOG))+","+str('{:3.1f}'.format(COG))+","+datenow+",004.3"
 
     # Speed and TWS adjustments before next GPS update
     if SOGup==True:
@@ -219,7 +219,7 @@ while True:
     # Create other instrument data
     STW=abs(SOG-random.randint(0, 3)) #Make a random adjustment for current
     VHW="$IIVHW,,,"+str(STW)+",N" # Water speed and heading
-    WEA = "$GPWEA," + str(tempin) + "," + str(tempout) + "," + str(pressure) + "," + str(humidity)
+    WEA = "$GPWEA," + str(tempin) + "," + str(tempout) + "," + str(pressure) + "," + str(humidity) + "," 
     UDPsentences=[RMC,DBT,VHW,VWR,MTW,WEA]
     for nmea in range(len(UDPsentences)):
         UDPmessage(UDPsentences[nmea])
