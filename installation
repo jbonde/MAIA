@@ -8,6 +8,8 @@ Code for client program is maia.py
 
 guizero: Check that you have the newest version at https://lawsie.github.io/guizero/#upgrading-guizero
 Make sure to copy mypi.py to same directory as maia.py
+Using Bookworm you have to install GUIzero manually by copying the guizero directory from GitHub. See their installation notes there
+
 
 For MAIAserver these should be installed as well in order to support weather data sensors:
     pip3 install Adafruit_DHT
