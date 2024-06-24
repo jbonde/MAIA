@@ -1,6 +1,9 @@
 # Installation notes
 Guide and tips for installation
 
+OS
+Use RPi Imager to install Legacy RPi OS 32-bit if used with a Adafruit TFT display. For other applications newer versions (also 64 bit) can be used.
+
 ## Client
 Code for client program is maia.py
 
