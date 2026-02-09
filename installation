@@ -35,6 +35,13 @@ Goto desktop and open the new screensaver. Preferences/Display Modes/Mode: "Disa
 
 Adafruit PiTTFT:
     Installation of PiTFT display driver from AdaFruit
+    sudo apt update
+    sudo apt install git
+    git clone https://github.com/adafruit/Raspberry-Pi-Installer-Scripts.git
+    cd Raspberry-Pi-Installer-Scripts
+    sudo python3 adafruit-pitft.py
+
+    Used to be
     cd ~
     wget https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/adafruit-pitft.sh
     chmod +x adafruit-pitft.sh
