@@ -35,6 +35,22 @@ Goto desktop and open the new screensaver. Preferences/Display Modes/Mode: "Disa
 
 Adafruit PiTTFT:
     Installation of PiTFT display driver from AdaFruit
+    sudo pip3 install adafruit-python-shell --break-system-packages
+    cd ~/Raspberry-Pi-Installer-Scripts
+    sudo python3 adafruit-pitft.py
+
+    sudo nano /boot/firmware/config.txt
+    uncomment all "dtoverlay=...."
+    the insert:
+    dtparam=spi=on
+    dtoverlay=pitft35-resistive,rotate=90,speed=32000000,fps=20
+    framebuffer_width=480
+    framebuffer_height=320
+    hdmi_force_hotplug=0
+    hdmi_blanking=2
+    enable_tvout=0
+
+
     sudo apt update
     sudo apt install git
     git clone https://github.com/adafruit/Raspberry-Pi-Installer-Scripts.git
